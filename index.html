@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>跨平台記帳本 (EXCEL完美對齊版) v7.1.0</title>
+    <title>跨平台記帳本 (EXCEL完美對齊版) </title>
     <!-- 確保可以被 PWA 讀取安裝 -->
     <link rel="manifest" href="./manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -235,7 +235,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.1 (最新品項對齊與多年度路由)
+                Built for EXCEL Master Sync - v0.0.0.2 (全機無縫備份與匯入)
             </div>
         </div>
     </div>
@@ -250,7 +250,8 @@
         }
 
         // 強制更新機制 (打破 PWA 快取陷阱)
-        const APP_VERSION = '7.1.0';
+
+        const APP_VERSION = '0.0.0.2';
         if (localStorage.getItem('appVersion') !== APP_VERSION) {
             localStorage.setItem('appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -530,12 +531,30 @@
         }
 
         function exportData() {
-            const a = document.createElement('a'); a.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(records)); a.download = `backup_${Date.now()}.json`; a.click();
+            const backupData = {
+                records: records,
+                gasConfig: gasConfig,
+                yearSheetMap: yearSheetMap,
+                appPass: appPass
+            };
+            const a = document.createElement('a'); a.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData)); a.download = `backup_full_${Date.now()}.json`; a.click();
         }
         function importData(e) {
-            const f = e.target.files[0]; if(!f) return; const r = new FileReader();
-            r.onload = ev => { try{ records = JSON.parse(ev.target.result); localStorage.setItem('expenseRecords', JSON.stringify(records)); renderAll(); alert('成功還原！'); }catch(e){} };
-            r.readAsText(f);
+            const f = e.target.files[0]; if(!f) return; const reader = new FileReader();
+            reader.onload = ev => { 
+                try { 
+                    const data = JSON.parse(ev.target.result); 
+                    if(Array.isArray(data)) { records = data; } // 舊版備份相容
+                    else { 
+                        records = data.records || []; 
+                        if(data.gasConfig) { gasConfig = data.gasConfig; localStorage.setItem('moneyAppGasConfig', JSON.stringify(gasConfig)); document.getElementById('cfg-gas-url').value = gasConfig.url || ''; }
+                        if(data.yearSheetMap) { yearSheetMap = data.yearSheetMap; localStorage.setItem('moneyAppYearMap', JSON.stringify(yearSheetMap)); renderYearMap(); }
+                        if(data.appPass) { appPass = data.appPass; localStorage.setItem('appPass', appPass); }
+                    }
+                    localStorage.setItem('expenseRecords', JSON.stringify(records)); renderAll(); alert('成功還原帳本與系統設定！'); 
+                } catch(err){ alert('檔案格式錯誤'); } 
+            };
+            reader.readAsText(f); e.target.value = '';
         }
 
         // ================= 密碼鎖 =================
