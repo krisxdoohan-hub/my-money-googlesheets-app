@@ -150,6 +150,7 @@
                     <div class="flex gap-2" id="account-select-group">
                         <select id="input-account-main" class="w-full border-gray-200 rounded-xl p-3 bg-emerald-50/50 border focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm font-bold text-emerald-800">
                             <option value="現金">💵 現金</option>
+                            <option value="中信卡">💳 中信卡</option>
                             <option value="玉山卡">💳 玉山卡</option>
                         </select>
                     </div>
@@ -224,6 +225,15 @@
                     </div>
                 </div>
 
+                <!-- 試算表格式修復 -->
+                <div class="bg-orange-50 rounded-2xl border border-orange-100 p-4">
+                    <h4 class="font-bold text-orange-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-wrench text-orange-500 text-lg"></i> 試算表格式修復</h4>
+                    <button onclick="fixGoogleSheetsAAA()" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs shadow-sm shadow-orange-200 focus:outline-none flex justify-center items-center gap-2">
+                        <i class="ph ph-magic-wand"></i> 一鍵修復星期顯示 (AAA 錯誤)
+                    </button>
+                    <p class="text-[10px] text-orange-700 mt-2 leading-tight opacity-75">若匯入 Google Sheets 後日期旁無法顯示星期 (出現 aaa)，請點擊此按鈕，系統會雲端為您直接矯正所有工作表的星期顯示。</p>
+                </div>
+
                 <div class="bg-indigo-50 rounded-2xl border border-indigo-100 p-4">
                     <h4 class="font-bold text-indigo-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-shield-check text-indigo-500 text-lg"></i> 解鎖密碼</h4>
                     <div class="flex gap-2">
@@ -235,7 +245,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.3 (本地存儲命名空間隔離)
+                Built for EXCEL Master Sync - v0.0.0.4 (一鍵修復系統)
             </div>
         </div>
     </div>
@@ -250,7 +260,7 @@
         }
 
         // 強制更新機制 (打破 PWA 快取陷阱)
-        const APP_VERSION = '0.0.0.3';
+        const APP_VERSION = '0.0.0.4';
         if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
             localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -287,7 +297,6 @@
                 '每日紀錄': ['臨時收入']
             }
         };
-
 
         function getAmountColor(amount, type) {
             if (type === 'income') return 'text-green-600 font-bold'; 
@@ -537,6 +546,23 @@
             updateCloudIcon('sync');
             try { await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify({action: 'syncAll', records: records, yearMap: yearSheetMap}) }); updateCloudIcon('ok'); alert("所有資料已備份至雲端！"); } 
             catch(e) { updateCloudIcon('err'); alert("備份失敗，請確認網址正確且允許 CORS"); }
+        }
+
+        async function fixGoogleSheetsAAA() {
+            if(!gasConfig.url) return alert("請先到設定輸入 Google Apps Script 網址！");
+            const y = currentViewDate.getFullYear().toString();
+            const targetFileId = yearSheetMap[y];
+            if(!targetFileId) return alert("請先在設定中綁定「" + y + "年」的 Excel 檔案路由ID！");
+            
+            document.getElementById('loading-overlay').classList.replace('hidden', 'flex');
+            document.getElementById('loading-text').innerText = "雲端修復試算表中...";
+            try { 
+                await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify({action: 'fixWeekdays', targetSheetId: targetFileId}) }); 
+                alert("太棒了！已修復完成，請重整您的 Google Sheets 試算表畫面查看正確的星期顯示。"); 
+            } catch(e) { 
+                alert("修復失敗..."); 
+            }
+            document.getElementById('loading-overlay').classList.replace('flex', 'hidden');
         }
 
         function exportData() {
