@@ -150,7 +150,6 @@
                     <div class="flex gap-2" id="account-select-group">
                         <select id="input-account-main" class="w-full border-gray-200 rounded-xl p-3 bg-emerald-50/50 border focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm font-bold text-emerald-800">
                             <option value="現金">💵 現金</option>
-                            <option value="中信卡">💳 中信卡</option>
                             <option value="玉山卡">💳 玉山卡</option>
                         </select>
                     </div>
@@ -245,7 +244,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.4 (一鍵修復系統)
+                Built for EXCEL Master Sync - v0.0.0.5 (跨越編輯修復)
             </div>
         </div>
     </div>
@@ -260,7 +259,7 @@
         }
 
         // 強制更新機制 (打破 PWA 快取陷阱)
-        const APP_VERSION = '0.0.0.4';
+        const APP_VERSION = '0.0.0.5';
         if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
             localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -498,12 +497,18 @@
             let acc = currentModalRecordType === 'income' ? '系統' : document.getElementById('input-account-main').value;
             if (!d || !a) return alert("資料不完整");
 
+            let oldRec = null;
+            if (editingRecordId) {
+                const found = records.find(x => x.id === editingRecordId);
+                if (found) oldRec = JSON.parse(JSON.stringify(found));
+            }
+            
             const rec = { id: editingRecordId || Date.now().toString(), type: currentModalRecordType, account: acc, date: d, category: cat, note: n||"無備註", amount: parseFloat(a), currency: 'TWD' };
             if(editingRecordId) records[records.findIndex(x=>x.id===editingRecordId)] = rec; else records.push(rec);
             
             localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
             toggleModal('addRecordModal', 'addRecordContent', false);
-            renderAll(); syncSingleToGAS(editingRecordId ? 'edit':'add', rec);
+            renderAll(); syncSingleToGAS(editingRecordId ? 'edit':'add', rec, oldRec);
         }
 
         function executeDelete() {
@@ -511,7 +516,7 @@
             records = records.filter(r => r.id !== editingRecordId);
             localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
             toggleModal('addRecordModal', 'addRecordContent', false); renderAll();
-            if(rec) syncSingleToGAS('delete', rec);
+            if(rec) syncSingleToGAS('delete', null, rec);
         }
 
         function toggleModal(mId, cId, show) {
@@ -533,11 +538,18 @@
             else { i.innerHTML='<i class="ph ph-cloud-warning text-2xl text-red-500 cursor-pointer"></i>'; }
         }
 
-        async function syncSingleToGAS(act, rec) {
+        async function syncSingleToGAS(act, rec, oldRec = null) {
             if(!gasConfig.url) return; updateCloudIcon('sync');
-            const rYear = rec.date.substring(0, 4);
-            const targetFileId = yearSheetMap[rYear] || ''; // 自動挑選對應年份的檔案 ID
-            try { await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify({action: act, record: rec, targetSheetId: targetFileId}) }); updateCloudIcon('ok'); } 
+            let bodyData = { action: act, yearMap: yearSheetMap };
+            if (rec) {
+                bodyData.record = rec;
+                bodyData.targetSheetId = yearSheetMap[rec.date.substring(0, 4)] || '';
+            }
+            if (oldRec) {
+                bodyData.oldRecord = oldRec;
+                bodyData.oldTargetSheetId = yearSheetMap[oldRec.date.substring(0, 4)] || '';
+            }
+            try { await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify(bodyData) }); updateCloudIcon('ok'); } 
             catch(e) { updateCloudIcon('err'); console.error(e); }
         }
 
