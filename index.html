@@ -235,7 +235,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.2 (全機無縫備份與匯入)
+                Built for EXCEL Master Sync - v0.0.0.3 (本地存儲命名空間隔離)
             </div>
         </div>
     </div>
@@ -250,10 +250,9 @@
         }
 
         // 強制更新機制 (打破 PWA 快取陷阱)
-
-        const APP_VERSION = '0.0.0.2';
-        if (localStorage.getItem('appVersion') !== APP_VERSION) {
-            localStorage.setItem('appVersion', APP_VERSION);
+        const APP_VERSION = '0.0.0.3';
+        if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
+            localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.getRegistrations().then(function(registrations) {
                     for(let registration of registrations) { registration.update(); }
@@ -269,7 +268,7 @@
         let filterType = 'expense'; 
         let editingRecordId = null;
         let currentModalRecordType = 'expense';
-        let appPass = localStorage.getItem('appPass') || "000000"; 
+        let appPass = localStorage.getItem('excel_appPass') || "000000"; 
         let currentInput = "";
         let gasConfig = { url: '' };
         let yearSheetMap = {}; // 跨年份自動化派發表
@@ -289,6 +288,7 @@
             }
         };
 
+
         function getAmountColor(amount, type) {
             if (type === 'income') return 'text-green-600 font-bold'; 
             if (amount < 1000) return 'text-orange-500 font-medium'; 
@@ -297,7 +297,7 @@
         }
 
         function loadYearSheetMap() {
-            const saved = localStorage.getItem('moneyAppYearMap');
+            const saved = localStorage.getItem('excel_yearMap');
             if(saved) yearSheetMap = JSON.parse(saved); else yearSheetMap = {};
             renderYearMap();
         }
@@ -318,20 +318,29 @@
             const id = document.getElementById('input-sheet-id').value.trim();
             if(!y || !id) return;
             yearSheetMap[y] = id;
-            localStorage.setItem('moneyAppYearMap', JSON.stringify(yearSheetMap));
+            localStorage.setItem('excel_yearMap', JSON.stringify(yearSheetMap));
             document.getElementById('input-year').value = ''; document.getElementById('input-sheet-id').value = '';
             renderYearMap(); document.getElementById('settings-msg').innerText="已綁定年份"; document.getElementById('settings-msg').style.opacity=1; setTimeout(()=>document.getElementById('settings-msg').style.opacity=0, 3000);
         }
-        function deleteYearId(y) { delete yearSheetMap[y]; localStorage.setItem('moneyAppYearMap', JSON.stringify(yearSheetMap)); renderYearMap(); }
+        function deleteYearId(y) { delete yearSheetMap[y]; localStorage.setItem('excel_yearMap', JSON.stringify(yearSheetMap)); renderYearMap(); }
 
         // 初始化
         async function init() {
             clearPass();
-            const s = localStorage.getItem('moneyAppGasConfig'); 
+            
+            // 【自動資料轉移】若發現有舊版一般記帳本的 localstorage 資料，自動搬移過來
+            if (!localStorage.getItem('excel_expenseRecords') && localStorage.getItem('expenseRecords')) {
+                localStorage.setItem('excel_expenseRecords', localStorage.getItem('expenseRecords'));
+                if (localStorage.getItem('moneyAppGasConfig')) localStorage.setItem('excel_gasConfig', localStorage.getItem('moneyAppGasConfig'));
+                if (localStorage.getItem('moneyAppYearMap')) localStorage.setItem('excel_yearMap', localStorage.getItem('moneyAppYearMap'));
+                if (localStorage.getItem('appPass')) localStorage.setItem('excel_appPass', localStorage.getItem('appPass'));
+            }
+
+            const s = localStorage.getItem('excel_gasConfig'); 
             if (s) { gasConfig = JSON.parse(s); document.getElementById('cfg-gas-url').value = gasConfig.url || ''; }
             loadYearSheetMap();
             
-            const saved = localStorage.getItem('expenseRecords');
+            const saved = localStorage.getItem('excel_expenseRecords');
             if (saved) { 
                 records = JSON.parse(saved); 
                 records.forEach(r => { if(!r.currency) r.currency = 'TWD'; if(!r.type) r.type = 'expense'; }); 
@@ -483,7 +492,7 @@
             const rec = { id: editingRecordId || Date.now().toString(), type: currentModalRecordType, account: acc, date: d, category: cat, note: n||"無備註", amount: parseFloat(a), currency: 'TWD' };
             if(editingRecordId) records[records.findIndex(x=>x.id===editingRecordId)] = rec; else records.push(rec);
             
-            localStorage.setItem('expenseRecords', JSON.stringify(records));
+            localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
             toggleModal('addRecordModal', 'addRecordContent', false);
             renderAll(); syncSingleToGAS(editingRecordId ? 'edit':'add', rec);
         }
@@ -491,7 +500,7 @@
         function executeDelete() {
             const rec = records.find(x=>x.id===editingRecordId);
             records = records.filter(r => r.id !== editingRecordId);
-            localStorage.setItem('expenseRecords', JSON.stringify(records));
+            localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
             toggleModal('addRecordModal', 'addRecordContent', false); renderAll();
             if(rec) syncSingleToGAS('delete', rec);
         }
@@ -506,7 +515,7 @@
         function openSettings() { toggleModal('settingsModal', 'settingsContent', true); }
         function closeSettings() { toggleModal('settingsModal', 'settingsContent', false); }
         
-        function saveGasConfig() { gasConfig.url = document.getElementById('cfg-gas-url').value.trim(); localStorage.setItem('moneyAppGasConfig', JSON.stringify(gasConfig)); document.getElementById('settings-msg').innerText="已儲存"; document.getElementById('settings-msg').style.opacity=1; }
+        function saveGasConfig() { gasConfig.url = document.getElementById('cfg-gas-url').value.trim(); localStorage.setItem('excel_gasConfig', JSON.stringify(gasConfig)); document.getElementById('settings-msg').innerText="已儲存"; document.getElementById('settings-msg').style.opacity=1; }
         
         function updateCloudIcon(st) {
             const i = document.getElementById('cloud-status-icon');
@@ -547,11 +556,11 @@
                     if(Array.isArray(data)) { records = data; } // 舊版備份相容
                     else { 
                         records = data.records || []; 
-                        if(data.gasConfig) { gasConfig = data.gasConfig; localStorage.setItem('moneyAppGasConfig', JSON.stringify(gasConfig)); document.getElementById('cfg-gas-url').value = gasConfig.url || ''; }
-                        if(data.yearSheetMap) { yearSheetMap = data.yearSheetMap; localStorage.setItem('moneyAppYearMap', JSON.stringify(yearSheetMap)); renderYearMap(); }
-                        if(data.appPass) { appPass = data.appPass; localStorage.setItem('appPass', appPass); }
+                        if(data.gasConfig) { gasConfig = data.gasConfig; localStorage.setItem('excel_gasConfig', JSON.stringify(gasConfig)); document.getElementById('cfg-gas-url').value = gasConfig.url || ''; }
+                        if(data.yearSheetMap) { yearSheetMap = data.yearSheetMap; localStorage.setItem('excel_yearMap', JSON.stringify(yearSheetMap)); renderYearMap(); }
+                        if(data.appPass) { appPass = data.appPass; localStorage.setItem('excel_appPass', appPass); }
                     }
-                    localStorage.setItem('expenseRecords', JSON.stringify(records)); renderAll(); alert('成功還原帳本與系統設定！'); 
+                    localStorage.setItem('excel_expenseRecords', JSON.stringify(records)); renderAll(); alert('成功還原帳本與系統設定！'); 
                 } catch(err){ alert('檔案格式錯誤'); } 
             };
             reader.readAsText(f); e.target.value = '';
@@ -565,7 +574,7 @@
             if(currentInput.length===6) setTimeout(()=>{ if(currentInput===appPass){ document.getElementById('lock-screen').style.opacity=0; setTimeout(()=>document.getElementById('lock-screen').style.display='none', 300); } else { alert("錯誤"); clearPass(); } }, 100);
         }
         function clearPass() { currentInput=""; const d=document.getElementById('pass-dots').children; for(let i=0;i<6;i++) d[i].className="w-4 h-4 rounded-full border-2 border-white/30"; }
-        function changeAppPassword() { const n = document.getElementById('input-new-pass').value; if(n.length===6){ appPass=n; localStorage.setItem('appPass', n); alert("密碼已修改！"); document.getElementById('input-new-pass').value=''; } }
+        function changeAppPassword() { const n = document.getElementById('input-new-pass').value; if(n.length===6){ appPass=n; localStorage.setItem('excel_appPass', n); alert("密碼已修改！"); document.getElementById('input-new-pass').value=''; } }
 
         window.onload = init;
     </script>
