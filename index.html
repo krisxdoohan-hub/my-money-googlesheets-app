@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -245,7 +245,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.7 (完美雙向同步發布版)
+                Built for EXCEL Master Sync - v0.0.0.8 (完美雙向同步發布版)
             </div>
         </div>
     </div>
@@ -260,7 +260,7 @@
         }
 
         // 強制更新機制
-        const APP_VERSION = '0.0.0.7';
+        const APP_VERSION = '0.0.0.8';
         if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
             localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -554,7 +554,12 @@
                 bodyData.oldTargetSheetId = yearSheetMap[oldRec.date.substring(0, 4)] || '';
             }
             try { 
-                const res = await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify(bodyData) });
+                const res = await fetch(gasConfig.url, { 
+                    method: 'POST', 
+                    body: JSON.stringify(bodyData),
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    redirect: "follow"
+                });
                 const result = await res.json();
                 if(result.records && Array.isArray(result.records)) {
                     records = result.records;
@@ -573,7 +578,12 @@
             }
             updateCloudIcon('sync');
             try { 
-                const res = await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify({action: 'pull', yearMap: yearSheetMap}) });
+                const res = await fetch(gasConfig.url, { 
+                    method: 'POST', 
+                    body: JSON.stringify({action: 'pull', yearMap: yearSheetMap}),
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    redirect: "follow"
+                });
                 const result = await res.json();
                 if(result.records && Array.isArray(result.records)) {
                     records = result.records; // 完全以雲端資料為基準 (因為多手機雙向同步)
@@ -598,9 +608,13 @@
             document.getElementById('loading-overlay').classList.replace('hidden', 'flex');
             document.getElementById('loading-text').innerText = "雲端修復試算表中...";
             try { 
-                await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify({action: 'fixWeekdays', targetSheetId: targetFileId}) }); 
-                alert("太棒了！已修復完成，請重整您的 Google Sheets 試算表畫面查看正確的星期顯示。"); 
-            } catch(e) { 
+                await fetch(gasConfig.url, { 
+                    method: 'POST', 
+                    body: JSON.stringify({action: 'fixWeekdays', targetSheetId: targetFileId}),
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    redirect: "follow"
+                }); 
+                alert("太棒了！已修復完成，請重整您的 Google Sheets 試算表畫面查看正確的星期顯示。");
                 alert("修復失敗..."); 
             }
             document.getElementById('loading-overlay').classList.replace('flex', 'hidden');
