@@ -1,58 +1,648 @@
-const CACHE_NAME = 'budget-app-v0.0.0.6';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  'https://cdn.tailwindcss.com',
-  'https://unpkg.com/@phosphor-icons/web'
-];
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>跨平台記帳本 (EXCEL完美對齊版) </title>
+    <!-- 確保可以被 PWA 讀取安裝 -->
+    <link rel="manifest" href="./manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body { overscroll-behavior-y: none; -webkit-overflow-scrolling: touch; background-color: #f8fafc; }
+        .spinner { border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s ease-in-out infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .donut-chart { width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(#e2e8f0 0% 100%); position: relative; }
+        .donut-chart::before { content: ""; position: absolute; inset: 20px; background-color: #ffffff; border-radius: 50%; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body class="text-gray-800 font-sans antialiased h-[100dvh] flex flex-col relative overflow-hidden">
 
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(ASSETS_TO_CACHE))
-      .then(() => self.skipWaiting())
-  );
-});
+    <!-- 讀取遮罩 -->
+    <div id="loading-overlay" class="fixed inset-0 bg-indigo-900/80 z-[100] hidden flex-col justify-center items-center text-white backdrop-blur-sm">
+        <div class="spinner mb-4 w-10 h-10 border-4"></div>
+        <p id="loading-text" class="font-bold tracking-wider">處理中...</p>
+    </div>
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
+    <!-- 密碼解鎖畫面 (預設顯示) -->
+    <div id="lock-screen" class="fixed inset-0 bg-indigo-950 z-[200] flex flex-col justify-center items-center text-white p-6 transition-all duration-300">
+        <div class="w-full max-w-xs text-center space-y-10">
+            <div class="flex flex-col items-center gap-4">
+                <div class="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center border border-white/20 shadow-xl">
+                    <i class="ph ph-lock-key text-4xl text-indigo-300"></i>
+                </div>
+                <h2 class="text-2xl font-black tracking-widest text-white">私人記帳簿</h2>
+                <p class="text-xs text-indigo-200 font-medium opacity-60">系統已重置，請輸入預設密碼 000000</p>
+            </div>
+            
+            <div class="flex justify-center gap-4 py-4" id="pass-dots">
+                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
+                <div class="w-4 h-4 rounded-full border-2 border-white/30"></div>
+            </div>
 
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) {
-          return response; // Cache hit
+            <div class="grid grid-cols-3 gap-4 px-4">
+                <button onclick="inputPass('1')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">1</button>
+                <button onclick="inputPass('2')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">2</button>
+                <button onclick="inputPass('3')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">3</button>
+                <button onclick="inputPass('4')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">4</button>
+                <button onclick="inputPass('5')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">5</button>
+                <button onclick="inputPass('6')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">6</button>
+                <button onclick="inputPass('7')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">7</button>
+                <button onclick="inputPass('8')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">8</button>
+                <button onclick="inputPass('9')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">9</button>
+                <div class="h-16"></div>
+                <button onclick="inputPass('0')" class="h-16 rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all text-2xl font-black">0</button>
+                <button onclick="clearPass()" class="h-16 rounded-full text-red-300 font-bold active:scale-95 text-sm uppercase">清除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 標題列 -->
+    <header class="bg-white px-4 py-3 shadow-sm z-30 flex justify-between items-center flex-shrink-0">
+        <div class="flex items-center gap-2 text-indigo-700">
+            <i class="ph ph-wallet text-2xl"></i>
+            <span class="font-bold tracking-widest">EXCEL對接版</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <button id="cloud-status-icon" onclick="forceSyncUploadGAS()" class="text-gray-300 transition-colors p-1.5 rounded-full hover:bg-gray-100 focus:outline-none">
+                <i class="ph ph-cloud-slash text-2xl"></i>
+            </button>
+            <button onclick="openSettings()" class="text-gray-500 hover:text-indigo-600 transition-colors p-1.5 rounded-full hover:bg-indigo-50 focus:outline-none">
+                <i class="ph ph-gear text-2xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 relative">
+        <div class="max-w-5xl mx-auto">
+            <!-- 日期控制 -->
+            <header class="flex justify-between items-center mb-6">
+                <div class="flex items-center gap-3 mx-auto">
+                    <button onclick="changeMonth(-1)" class="p-2 bg-white rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-transform"><i class="ph ph-caret-left text-gray-400"></i></button>
+                    <div class="text-center min-w-[120px]">
+                        <p id="currentYearDisplay" class="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">2026</p>
+                        <button onclick="resetToToday()" class="group flex flex-col items-center w-full focus:outline-none">
+                            <h1 id="currentMonthDisplay" class="text-2xl font-black text-gray-800 leading-none group-active:scale-95 transition-transform">4月</h1>
+                            <span id="backTodayBtn" class="hidden text-[8px] font-black text-indigo-500 mt-1 bg-indigo-50 px-1.5 py-0.5 rounded uppercase tracking-tighter">回到本月</span>
+                        </button>
+                    </div>
+                    <button onclick="changeMonth(1)" class="p-2 bg-white rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-transform"><i class="ph ph-caret-right text-gray-400"></i></button>
+                </div>
+            </header>
+
+            <section id="currencyDashboard" class="flex overflow-x-auto gap-4 pb-4 mb-4 no-scrollbar scroll-smooth snap-x"></section>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="space-y-6">
+                    <div class="bg-white p-6 rounded-[24px] shadow-sm border border-gray-100">
+                        <div class="flex justify-between items-center mb-6">
+                            <div class="flex items-center gap-2"><i class="ph ph-chart-pie-slice text-indigo-500 text-xl"></i><h2 class="text-sm font-bold text-gray-800">類別分佈</h2></div>
+                        </div>
+                        <div id="analyticsContent" class="flex flex-col items-center"></div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between sticky top-0 bg-[#f8fafc]/90 backdrop-blur-md py-2 z-10">
+                        <div class="flex items-center gap-2"><i class="ph ph-list-dashes text-indigo-500 text-xl"></i><h2 class="text-sm font-bold text-gray-800 tracking-tight">明細清單</h2></div>
+                        <div class="flex bg-gray-200 p-1 rounded-xl shadow-inner">
+                            <button onclick="setFilterType('expense')" id="filterExp" class="px-4 py-1 text-xs font-bold rounded-lg transition-all bg-white text-indigo-600 shadow-sm">支出</button>
+                            <button onclick="setFilterType('income')" id="filterInc" class="px-4 py-1 text-xs font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700">收入</button>
+                        </div>
+                    </div>
+                    <div id="historyList" class="space-y-4 pb-6"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <button onclick="openAddModal()" class="fixed bottom-6 right-6 bg-indigo-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:bg-indigo-700 active:scale-90 transition-transform z-40 focus:outline-none">
+        <i class="ph ph-plus text-2xl"></i>
+    </button>
+
+    <!-- 新增/編輯紀錄 Modal -->
+    <div id="addRecordModal" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center items-center p-0 sm:p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-white w-full sm:max-w-md rounded-t-[32px] sm:rounded-[24px] shadow-2xl transform translate-y-full sm:translate-y-0 transition-transform duration-300" id="addRecordContent">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold text-gray-800" id="modalTitle">新增紀錄</h3>
+                    <button onclick="closeAddModal()" class="p-2 bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 active:scale-95 transition-all focus:outline-none"><i class="ph ph-x text-lg"></i></button>
+                </div>
+                
+                <div class="flex bg-gray-100 p-1 rounded-xl mb-5">
+                    <button type="button" onclick="setRecordType('expense')" id="btnTypeExp" class="flex-1 py-2 text-sm font-bold rounded-lg transition-all bg-white text-red-500 shadow-sm">支出</button>
+                    <button type="button" onclick="setRecordType('income')" id="btnTypeInc" class="flex-1 py-2 text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-green-500">收入</button>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <input type="date" id="input-date" class="w-full border-gray-200 rounded-xl p-3 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm font-medium text-gray-700">
+                        <p class="text-[10px] text-indigo-500 mt-1.5 ml-1 font-bold tracking-wide"><i class="ph ph-info"></i> 系統會嚴格依照您選擇的「日期」將資料派發至該年度的檔案，無須擔心延遲送出或事後補登。</p>
+                    </div>
+                    
+                    <div class="flex gap-2" id="account-select-group">
+                        <select id="input-account-main" class="w-full border-gray-200 rounded-xl p-3 bg-emerald-50/50 border focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm font-bold text-emerald-800">
+                            <option value="現金">💵 現金</option>
+                            <option value="信用卡">💳 中信卡</option>
+                            <option value="信用卡">💳 玉山卡</option>
+                        </select>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <select id="input-category-main" onchange="updateSubCategories()" class="w-1/2 border-gray-200 rounded-xl p-3 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm font-bold text-gray-800"></select>
+                        <select id="input-category-sub" class="w-1/2 border-gray-200 rounded-xl p-3 bg-indigo-50/50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm font-bold text-indigo-700"></select>
+                    </div>
+                    <div>
+                        <input type="text" id="input-note" placeholder="EXCEL 項目細節品名 (選填)" class="w-full border-gray-200 rounded-xl p-3 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm text-gray-700">
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="input-currency" class="w-1/3 border-gray-200 rounded-xl p-3 bg-indigo-50/50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm font-bold text-indigo-700">
+                            <option value="TWD">TWD</option>
+                        </select>
+                        <input type="number" id="input-amount" placeholder="金額" class="w-2/3 border-gray-200 rounded-xl p-3 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xl font-bold text-gray-800 tracking-wider">
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex gap-3">
+                    <button id="btn-delete" onclick="executeDelete()" class="hidden w-1/3 bg-red-100 hover:bg-red-200 text-red-600 font-bold py-3 rounded-xl transition duration-200 active:scale-95 focus:outline-none">
+                        刪除
+                    </button>
+                    <button id="btn-save" onclick="saveRecord()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition duration-200 shadow-md shadow-indigo-200 active:scale-95 flex justify-center items-center gap-2 focus:outline-none">
+                        儲存紀錄
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 設定 Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center items-center p-0 sm:p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-white w-full sm:max-w-md rounded-t-[32px] sm:rounded-[24px] shadow-2xl transform translate-y-full sm:translate-y-0 transition-transform duration-300 flex flex-col max-h-[90vh]" id="settingsContent">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="ph ph-gear-six text-indigo-600 text-xl"></i> 系統設定</h3>
+                <button onclick="closeSettings()" class="p-2 bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 active:scale-95 transition-all focus:outline-none"><i class="ph ph-x text-lg"></i></button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1 space-y-6">
+                <!-- Google Sheets -->
+                <div class="bg-emerald-50/50 rounded-2xl border border-emerald-100 p-4">
+                    <h4 class="font-bold text-emerald-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-google-logo text-emerald-500 text-lg"></i> Google Sheets 對接網址</h4>
+                    <div class="space-y-3">
+                        <input type="text" id="cfg-gas-url" placeholder="貼上 Google Apps Script 網址" class="w-full border-emerald-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-emerald-400 focus:outline-none font-mono">
+                        <button onclick="saveGasConfig()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs shadow-sm shadow-emerald-200 focus:outline-none">
+                            儲存連線網址
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 跨年份檔案路由設定 -->
+                <div class="bg-blue-50/50 rounded-2xl border border-blue-100 p-4">
+                    <h4 class="font-bold text-blue-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-files text-blue-500 text-lg"></i> 各年度 Excel 檔案路由 (File ID)</h4>
+                    <div id="year-id-list" class="space-y-2 mb-3"></div>
+                    <div class="flex gap-2">
+                        <input type="number" id="input-year" placeholder="年份(如:2026)" class="w-1/3 border-blue-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none font-bold">
+                        <input type="text" id="input-sheet-id" placeholder="貼上專屬 ID" class="w-2/3 border-blue-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-400 focus:outline-none font-mono">
+                    </div>
+                    <button onclick="addYearId()" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs shadow-sm focus:outline-none">
+                        新增 / 更新年度綁定 (可同時綁定多個)
+                    </button>
+                    <p class="text-[10px] text-blue-700 mt-2 leading-tight opacity-75">有了這個設定，系統遇到跨年資料，就會依照日期自動將記錄派發到對應年份的檔案！不須改寫程式碼。</p>
+                </div>
+
+                <div class="bg-gray-50 rounded-2xl border border-gray-100 p-4">
+                    <h4 class="font-bold text-gray-700 text-sm flex items-center gap-2 mb-3"><i class="ph ph-hard-drives text-gray-500 text-lg"></i> 手動備份</h4>
+                    <div class="flex gap-2">
+                        <button onclick="exportData()" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs flex justify-center items-center gap-1 focus:outline-none"><i class="ph ph-export"></i> 匯出</button>
+                        <input type="file" id="import-file" accept=".json" class="hidden" onchange="importData(event)">
+                        <button onclick="document.getElementById('import-file').click()" class="flex-1 bg-white hover:bg-gray-100 text-gray-700 font-bold border border-gray-200 py-2 rounded-lg active:scale-95 transition text-xs flex justify-center items-center gap-1 focus:outline-none"><i class="ph ph-download-simple"></i> 匯入</button>
+                    </div>
+                </div>
+
+                <!-- 試算表格式修復 -->
+                <div class="bg-orange-50 rounded-2xl border border-orange-100 p-4">
+                    <h4 class="font-bold text-orange-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-wrench text-orange-500 text-lg"></i> 試算表格式修復</h4>
+                    <button onclick="fixGoogleSheetsAAA()" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs shadow-sm shadow-orange-200 focus:outline-none flex justify-center items-center gap-2">
+                        <i class="ph ph-magic-wand"></i> 一鍵修復星期顯示 (AAA 錯誤)
+                    </button>
+                    <p class="text-[10px] text-orange-700 mt-2 leading-tight opacity-75">若匯入 Google Sheets 後日期旁無法顯示星期 (出現 aaa)，請點擊此按鈕，系統會雲端為您直接矯正所有工作表的星期顯示。</p>
+                </div>
+
+                <div class="bg-indigo-50 rounded-2xl border border-indigo-100 p-4">
+                    <h4 class="font-bold text-indigo-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-shield-check text-indigo-500 text-lg"></i> 解鎖密碼</h4>
+                    <div class="flex gap-2">
+                        <input type="password" id="input-new-pass" maxlength="6" placeholder="新密碼(6碼)" class="w-2/3 border-indigo-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none font-mono">
+                        <button onclick="changeAppPassword()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg active:scale-95 transition text-xs focus:outline-none">修改</button>
+                    </div>
+                </div>
+            
+                <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
+            </div>
+            <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
+                Built for EXCEL Master Sync - v0.0.0.7 (完美雙向同步發布版)
+            </div>
+        </div>
+    </div>
+
+    <!-- 核心腳本 -->
+    <script>
+        // 註冊 Service Worker
+        if ('serviceWorker' in navigator) { 
+            window.addEventListener('load', () => { 
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW註冊失敗', err)); 
+            }); 
         }
-        return fetch(event.request).then(
-          function(response) {
-            // Check if we received a valid response
-            if(!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
+
+        // 強制更新機制
+        const APP_VERSION = '0.0.0.7';
+        if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
+            localStorage.setItem('excel_appVersion', APP_VERSION);
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) { registration.update(); }
+                });
             }
-            var responseToCache = response.clone();
-            caches.open(CACHE_NAME)
-              .then(function(cache) {
-                // Don't cache POST requests or external API calls here generally, but our ASSETS_TO_CACHE are GET
-                if(event.request.method === "GET") {
-                  cache.put(event.request, responseToCache);
+            alert('系統已自動更新至最新版本 ' + APP_VERSION + '，即將為您重新載入！');
+            location.reload(true);
+        }
+
+        let records = []; 
+        let currentViewDate = new Date(); 
+        let currentCurrency = 'TWD'; 
+        let filterType = 'expense'; 
+        let editingRecordId = null;
+        let currentModalRecordType = 'expense';
+        let appPass = localStorage.getItem('excel_appPass') || "000000"; 
+        let currentInput = "";
+        let gasConfig = { url: '' };
+        let yearSheetMap = {}; 
+
+        function closeAddModal() { toggleModal('addRecordModal', 'addRecordContent', false); }
+
+        const categoryMap = {
+            'expense': { 
+                '每日紀錄': ['主食', '副食', '零食', '外食', '日用雜貨', '治裝費', '醫療費', '交通費', '娛樂費', '喜慶・交際費', '其他'], 
+                '本月固定支出': ['電話費', '行動電話費', '房貸', '保險(個人)', '貸款(個人/房屋)', '稅金(燃料/房屋/所得)', '信用卡(玉山卡費)', '汽機車保養費', '股票定期定額(0050)', '股票定期定額(009816)']
+            },
+
+            'income': { 
+                '本月收入': ['薪水', '股息', '獎金'],
+                '每日紀錄': ['臨時收入']
+            }
+        };
+
+        function getAmountColor(amount, type) {
+            if (type === 'income') return 'text-green-600 font-bold'; 
+            if (amount < 1000) return 'text-orange-500 font-medium'; 
+            if (amount < 3000) return 'text-rose-500 font-bold';    
+            return 'text-red-600 font-black'; 
+        }
+
+        function loadYearSheetMap() {
+            const saved = localStorage.getItem('excel_yearMap');
+            if(saved) yearSheetMap = JSON.parse(saved); else yearSheetMap = {};
+            renderYearMap();
+        }
+        function renderYearMap() {
+            const list = document.getElementById('year-id-list');
+            list.innerHTML = Object.keys(yearSheetMap).sort().map(y => `
+                <div class="flex justify-between items-center bg-white p-2 rounded-lg border border-blue-100 shadow-sm">
+                    <span class="text-xs font-black text-blue-800">${y}年</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-mono text-gray-400 truncate max-w-[120px] bg-gray-50 px-1 rounded">${yearSheetMap[y]}</span>
+                        <button onclick="deleteYearId('${y}')" class="text-red-400 hover:text-red-600 active:scale-90"><i class="ph ph-trash"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        function addYearId() {
+            const y = document.getElementById('input-year').value;
+            const id = document.getElementById('input-sheet-id').value.trim();
+            if(!y || !id) return;
+            yearSheetMap[y] = id;
+            localStorage.setItem('excel_yearMap', JSON.stringify(yearSheetMap));
+            document.getElementById('input-year').value = ''; document.getElementById('input-sheet-id').value = '';
+            renderYearMap(); document.getElementById('settings-msg').innerText="已綁定年份"; document.getElementById('settings-msg').style.opacity=1; setTimeout(()=>document.getElementById('settings-msg').style.opacity=0, 3000);
+        }
+        function deleteYearId(y) { delete yearSheetMap[y]; localStorage.setItem('excel_yearMap', JSON.stringify(yearSheetMap)); renderYearMap(); }
+
+        // 初始化
+        async function init() {
+            clearPass();
+            
+            if (!localStorage.getItem('excel_expenseRecords') && localStorage.getItem('expenseRecords')) {
+                localStorage.setItem('excel_expenseRecords', localStorage.getItem('expenseRecords'));
+                if (localStorage.getItem('moneyAppGasConfig')) localStorage.setItem('excel_gasConfig', localStorage.getItem('moneyAppGasConfig'));
+                if (localStorage.getItem('moneyAppYearMap')) localStorage.setItem('excel_yearMap', localStorage.getItem('moneyAppYearMap'));
+                if (localStorage.getItem('appPass')) localStorage.setItem('excel_appPass', localStorage.getItem('appPass'));
+            }
+
+            const s = localStorage.getItem('excel_gasConfig'); 
+            if (s) { gasConfig = JSON.parse(s); document.getElementById('cfg-gas-url').value = gasConfig.url || ''; }
+            loadYearSheetMap();
+            
+            const saved = localStorage.getItem('excel_expenseRecords');
+            if (saved) { 
+                records = JSON.parse(saved); 
+                records.forEach(r => { if(!r.currency) r.currency = 'TWD'; if(!r.type) r.type = 'expense'; }); 
+            }
+            renderAll();
+
+            // 完美的雙向同步：當網頁載入（開機）時，馬上向雲端請求拉取最新資料，並更新版面
+            // 這解決了 A 手機打完，B 手機開機時資料沒同步的問題。
+            if (gasConfig.url) {
+                setTimeout(() => autoPullFromGAS(false), 500); 
+            }
+        }
+
+        function renderAll() {
+            document.getElementById('currentYearDisplay').innerText = currentViewDate.getFullYear();
+            document.getElementById('currentMonthDisplay').innerText = `${currentViewDate.getMonth() + 1}月`;
+            document.getElementById('backTodayBtn').classList.toggle('hidden', currentViewDate.getFullYear() === new Date().getFullYear() && currentViewDate.getMonth() === new Date().getMonth());
+            
+            renderCurrencyDashboard();
+            renderAnalytics();
+            renderHistory();
+        }
+
+        function changeMonth(delta) { currentViewDate.setMonth(currentViewDate.getMonth() + delta); renderAll(); }
+        function resetToToday() { currentViewDate = new Date(); renderAll(); }
+
+        function renderCurrencyDashboard() {
+            const y = currentViewDate.getFullYear(), m = String(currentViewDate.getMonth() + 1).padStart(2, '0');
+            const monthRecords = records.filter(r => r.date.startsWith(`${y}-${m}`) && r.currency === currentCurrency);
+            const inc = monthRecords.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+            const exp = monthRecords.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+            const net = inc - exp;
+
+            document.getElementById('currencyDashboard').innerHTML = `
+                <div class="min-w-full snp-center p-5 rounded-[24px] bg-indigo-600 text-white border border-indigo-500 shadow-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-xs font-black tracking-widest text-indigo-200">${currentCurrency}</span>
+                        <i class="ph ph-coins text-lg bg-white/20 p-1.5 rounded-full"></i>
+                    </div>
+                    <div><p class="text-xs font-medium mb-1 opacity-80">本月結餘</p><h3 class="text-3xl font-black">${net.toLocaleString()}</h3></div>
+                    <div class="flex items-center gap-4 mt-4 pt-4 border-t border-indigo-500/50">
+                        <div class="flex-1"><p class="text-[10px] font-bold opacity-60">收入</p><p class="text-sm font-bold mt-0.5">${inc.toLocaleString()}</p></div>
+                        <div class="flex-1"><p class="text-[10px] font-bold opacity-60">支出</p><p class="text-sm font-bold mt-0.5">${exp.toLocaleString()}</p></div>
+                    </div>
+                </div>`;
+        }
+
+        function setFilterType(type) {
+            filterType = type;
+            document.getElementById('filterExp').className = `px-4 py-1 text-xs font-bold rounded-lg transition-all ${type==='expense' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`;
+            document.getElementById('filterInc').className = `px-4 py-1 text-xs font-bold rounded-lg transition-all ${type==='income' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`;
+            renderAnalytics(); renderHistory();
+        }
+
+        function renderAnalytics() {
+            const container = document.getElementById('analyticsContent');
+            const y = currentViewDate.getFullYear(), m = String(currentViewDate.getMonth() + 1).padStart(2, '0');
+            const targetRecords = records.filter(r => r.date.startsWith(`${y}-${m}`) && r.type === filterType);
+            const total = targetRecords.reduce((s, r) => s + r.amount, 0);
+
+            if(total === 0) { container.innerHTML = `<div class="py-10 text-xs text-gray-400">尚無資料</div>`; return; }
+
+            const catData = {}; 
+            targetRecords.forEach(r => {
+                const main = r.category.split('-')[0] || '其他';
+                catData[main] = (catData[main] || 0) + r.amount;
+            });
+
+            let listHtml = '<div class="w-full mt-6 space-y-3">';
+            Object.keys(catData).sort((a,b)=>catData[b]-catData[a]).forEach((main, i) => {
+                const color = ['#6366f1', '#a855f7', '#ec4899', '#f43f5e', '#f97316', '#14b8a6'][i % 6];
+                listHtml += `<div class="flex justify-between items-center text-sm"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${color}"></span><span class="font-bold">${main}</span></div><span class="${getAmountColor(catData[main], filterType)}">${catData[main].toLocaleString()}</span></div>`;
+            });
+            container.innerHTML = `<div class="font-black text-2xl text-indigo-900 drop-shadow-sm">$${total.toLocaleString()}</div>${listHtml}</div>`;
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('historyList');
+            const y = currentViewDate.getFullYear(), m = String(currentViewDate.getMonth() + 1).padStart(2, '0');
+            const targetRecords = records.filter(r => r.date.startsWith(`${y}-${m}`) && r.type === filterType).sort((a,b)=>b.date.localeCompare(a.date));
+            if(targetRecords.length === 0) { list.innerHTML = `<div class="p-8 text-center text-gray-400 text-sm border rounded-xl">無明細</div>`; return; }
+
+            let html = '<div class="bg-white rounded-2xl shadow-sm border overflow-hidden divide-y divide-gray-50">';
+            targetRecords.forEach(r => {
+                const accBadge = r.account ? `<span class="bg-emerald-50 text-emerald-600 px-1 rounded text-[10px] ml-2 border">${r.account}</span>` : '';
+                html += `
+                <div onclick="editRecord('${r.id}')" class="p-4 flex justify-between items-center hover:bg-gray-50 active:bg-gray-100 cursor-pointer">
+                    <div>
+                        <p class="text-sm font-bold text-gray-800">${r.category.replace('-', ' > ')} ${accBadge}</p>
+                        <p class="text-xs text-gray-400 font-mono mt-1">${r.date.substring(5)} | ${r.note}</p>
+                    </div>
+                    <span class="text-base ${getAmountColor(r.amount, r.type)}">${r.amount.toLocaleString()}</span>
+                </div>`;
+            });
+            list.innerHTML = html + '</div>';
+        }
+
+        function setRecordType(type) {
+            currentModalRecordType = type;
+            document.getElementById('btnTypeExp').className = `flex-1 py-2 text-sm font-bold rounded-lg ${type==='expense'?'bg-white text-red-500 shadow-sm':'text-gray-500'}`;
+            document.getElementById('btnTypeInc').className = `flex-1 py-2 text-sm font-bold rounded-lg ${type==='income'?'bg-white text-green-500 shadow-sm':'text-gray-500'}`;
+            document.getElementById('account-select-group').classList.toggle('hidden', type==='income');
+            
+            const mainSel = document.getElementById('input-category-main');
+            mainSel.innerHTML = Object.keys(categoryMap[type]).map(c => `<option value="${c}">${c}</option>`).join('');
+            updateSubCategories();
+        }
+
+        function updateSubCategories(def = null) {
+            const mainCat = document.getElementById('input-category-main').value;
+            const subSel = document.getElementById('input-category-sub');
+            const subs = categoryMap[currentModalRecordType][mainCat] || [];
+            if(subs.length > 0) {
+                subSel.classList.remove('hidden');
+                subSel.innerHTML = subs.map(s => `<option value="${s}">${s}</option>`).join('');
+                if(def) subSel.value = def;
+            } else {
+                subSel.classList.add('hidden');
+            }
+        }
+
+        function openAddModal() {
+            editingRecordId = null; document.getElementById('modalTitle').innerText = '新增紀錄';
+            document.getElementById('btn-delete').classList.add('hidden');
+            document.getElementById('input-date').value = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`;
+            document.getElementById('input-amount').value = ''; document.getElementById('input-note').value = '';
+            setRecordType(filterType);
+            toggleModal('addRecordModal', 'addRecordContent', true);
+        }
+
+        function editRecord(id) {
+            editingRecordId = id; const r = records.find(x => x.id === id); if(!r) return;
+            document.getElementById('modalTitle').innerText = '編輯紀錄';
+            document.getElementById('btn-delete').classList.remove('hidden');
+            document.getElementById('input-date').value = r.date;
+            document.getElementById('input-note').value = r.note === '無備註' ? '' : r.note;
+            document.getElementById('input-amount').value = r.amount;
+            setRecordType(r.type || 'expense');
+            if(r.account) document.getElementById('input-account-main').value = r.account;
+            
+            const p = r.category.split('-');
+            document.getElementById('input-category-main').value = p[0];
+            updateSubCategories(p[1]);
+            toggleModal('addRecordModal', 'addRecordContent', true);
+        }
+
+        function saveRecord() {
+            const d = document.getElementById('input-date').value, a = document.getElementById('input-amount').value, n = document.getElementById('input-note').value;
+            const sSub = document.getElementById('input-category-sub');
+            let cat = document.getElementById('input-category-main').value; if(!sSub.classList.contains('hidden')) cat += `-${sSub.value}`;
+            let acc = currentModalRecordType === 'income' ? '系統' : document.getElementById('input-account-main').value;
+            if (!d || !a) return alert("資料不完整");
+
+            let oldRec = null;
+            if (editingRecordId) {
+                const found = records.find(x => x.id === editingRecordId);
+                if (found) oldRec = JSON.parse(JSON.stringify(found));
+            }
+            
+            const rec = { id: editingRecordId || (new Date().getTime().toString()), type: currentModalRecordType, account: acc, date: d, category: cat, note: n||"無備註", amount: parseFloat(a), currency: 'TWD' };
+            if(editingRecordId) records[records.findIndex(x=>x.id===editingRecordId)] = rec; else records.push(rec);
+            
+            localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
+            toggleModal('addRecordModal', 'addRecordContent', false);
+            renderAll(); syncSingleToGAS(editingRecordId ? 'edit':'add', rec, oldRec);
+        }
+
+        function executeDelete() {
+            const rec = records.find(x=>x.id===editingRecordId);
+            records = records.filter(r => r.id !== editingRecordId);
+            localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
+            toggleModal('addRecordModal', 'addRecordContent', false); renderAll();
+            if(rec) syncSingleToGAS('delete', null, rec);
+        }
+
+        function toggleModal(mId, cId, show) {
+            const m = document.getElementById(mId), c = document.getElementById(cId);
+            if(show) { m.classList.remove('hidden'); m.classList.add('flex'); requestAnimationFrame(()=>{m.classList.remove('opacity-0'); c.classList.remove('translate-y-full');}); } 
+            else { m.classList.add('opacity-0'); c.classList.add('translate-y-full'); setTimeout(()=>{m.classList.add('hidden'); m.classList.remove('flex');}, 300); }
+        }
+
+        function openSettings() { toggleModal('settingsModal', 'settingsContent', true); }
+        function closeSettings() { toggleModal('settingsModal', 'settingsContent', false); }
+        
+        function saveGasConfig() { gasConfig.url = document.getElementById('cfg-gas-url').value.trim(); localStorage.setItem('excel_gasConfig', JSON.stringify(gasConfig)); document.getElementById('settings-msg').innerText="已儲存"; document.getElementById('settings-msg').style.opacity=1; }
+        
+        function updateCloudIcon(st) {
+            const i = document.getElementById('cloud-status-icon');
+            if(st==='ok'){ i.innerHTML='<i class="ph ph-cloud-check text-2xl text-green-500"></i>'; }
+            else if(st==='sync'){ i.innerHTML='<div class="spinner w-5 h-5 border-2 border-indigo-500 border-t-transparent"></div>'; }
+            else { i.innerHTML='<i class="ph ph-cloud-warning text-2xl text-red-500 cursor-pointer"></i>'; }
+        }
+
+        // 當單筆寫入時，傳送給 Google Apps Script，系統回傳完整的隱藏資料庫紀錄以確保本地100%同步
+        async function syncSingleToGAS(act, rec, oldRec = null) {
+            if(!gasConfig.url) return; updateCloudIcon('sync');
+            let bodyData = { action: act, yearMap: yearSheetMap };
+            if (rec) {
+                bodyData.record = rec;
+                bodyData.targetSheetId = yearSheetMap[rec.date.substring(0, 4)] || '';
+            }
+            if (oldRec) {
+                bodyData.oldRecord = oldRec;
+                bodyData.oldTargetSheetId = yearSheetMap[oldRec.date.substring(0, 4)] || '';
+            }
+            try { 
+                const res = await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify(bodyData) });
+                const result = await res.json();
+                if(result.records && Array.isArray(result.records)) {
+                    records = result.records;
+                    localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
+                    renderAll();
                 }
-              });
-            return response;
-          }
-        );
-      })
-  );
-});
+                updateCloudIcon('ok'); 
+            } catch(e) { updateCloudIcon('err'); console.error(e); }
+        }
+
+        // 開機/手動按雲時，跟 Google 進行隱藏表同步
+        async function autoPullFromGAS(isManual = false) {
+            if(!gasConfig.url) {
+                if(isManual) alert("請先到設定輸入 Google Apps Script 網址！");
+                return;
+            }
+            updateCloudIcon('sync');
+            try { 
+                const res = await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify({action: 'pull', yearMap: yearSheetMap}) });
+                const result = await res.json();
+                if(result.records && Array.isArray(result.records)) {
+                    records = result.records; // 完全以雲端資料為基準 (因為多手機雙向同步)
+                    localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
+                    renderAll();
+                }
+                updateCloudIcon('ok');
+                if(isManual) alert("雲端資料同步完成！您的手機已具備最新資料，不會互相覆蓋了。");
+            } catch(e) { updateCloudIcon('err'); if(isManual) alert("同步失敗，狀態網址是否有被關閉？"); }
+        }
+
+        async function forceSyncUploadGAS() {
+            autoPullFromGAS(true);
+        }
+
+        async function fixGoogleSheetsAAA() {
+            if(!gasConfig.url) return alert("請先到設定輸入 Google Apps Script 網址！");
+            const y = currentViewDate.getFullYear().toString();
+            const targetFileId = yearSheetMap[y];
+            if(!targetFileId) return alert("請先在設定中綁定「" + y + "年」的 Excel 檔案路由ID！");
+            
+            document.getElementById('loading-overlay').classList.replace('hidden', 'flex');
+            document.getElementById('loading-text').innerText = "雲端修復試算表中...";
+            try { 
+                await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify({action: 'fixWeekdays', targetSheetId: targetFileId}) }); 
+                alert("太棒了！已修復完成，請重整您的 Google Sheets 試算表畫面查看正確的星期顯示。"); 
+            } catch(e) { 
+                alert("修復失敗..."); 
+            }
+            document.getElementById('loading-overlay').classList.replace('flex', 'hidden');
+        }
+
+        function exportData() {
+            const backupData = {
+                records: records,
+                gasConfig: gasConfig,
+                yearSheetMap: yearSheetMap,
+                appPass: appPass
+            };
+            const a = document.createElement('a'); a.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData)); a.download = `backup_full_${Date.now()}.json`; a.click();
+        }
+        function importData(e) {
+            const f = e.target.files[0]; if(!f) return; const reader = new FileReader();
+            reader.onload = ev => { 
+                try { 
+                    const data = JSON.parse(ev.target.result); 
+                    if(Array.isArray(data)) { records = data; } 
+                    else { 
+                        records = data.records || []; 
+                        if(data.gasConfig) { gasConfig = data.gasConfig; localStorage.setItem('excel_gasConfig', JSON.stringify(gasConfig)); document.getElementById('cfg-gas-url').value = gasConfig.url || ''; }
+                        if(data.yearSheetMap) { yearSheetMap = data.yearSheetMap; localStorage.setItem('excel_yearMap', JSON.stringify(yearSheetMap)); renderYearMap(); }
+                        if(data.appPass) { appPass = data.appPass; localStorage.setItem('excel_appPass', appPass); }
+                    }
+                    localStorage.setItem('excel_expenseRecords', JSON.stringify(records)); renderAll(); alert('成功還原帳本與系統設定！'); 
+                } catch(err){ alert('檔案格式錯誤'); } 
+            };
+            reader.readAsText(f); e.target.value = '';
+        }
+
+        function inputPass(n) {
+            if(currentInput.length>=6)return; currentInput+=n;
+            const dots = document.getElementById('pass-dots').children;
+            for(let j=0; j<6; j++) dots[j].className = j<currentInput.length ? "w-4 h-4 rounded-full bg-indigo-400 border-2 border-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.5)]" : "w-4 h-4 rounded-full border-2 border-white/30";
+            if(currentInput.length===6) setTimeout(()=>{ if(currentInput===appPass){ document.getElementById('lock-screen').style.opacity=0; setTimeout(()=>document.getElementById('lock-screen').style.display='none', 300); } else { alert("錯誤"); clearPass(); } }, 100);
+        }
+        function clearPass() { currentInput=""; const d=document.getElementById('pass-dots').children; for(let i=0;i<6;i++) d[i].className="w-4 h-4 rounded-full border-2 border-white/30"; }
+        function changeAppPassword() { const n = document.getElementById('input-new-pass').value; if(n.length===6){ appPass=n; localStorage.setItem('excel_appPass', n); alert("密碼已修改！"); document.getElementById('input-new-pass').value=''; } }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
