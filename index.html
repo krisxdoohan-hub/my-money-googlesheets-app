@@ -1,4 +1,4 @@
-\<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -615,6 +615,7 @@
                     redirect: "follow"
                 }); 
                 alert("太棒了！已修復完成，請重整您的 Google Sheets 試算表畫面查看正確的星期顯示。");
+            } catch(e) {
                 alert("修復失敗..."); 
             }
             document.getElementById('loading-overlay').classList.replace('flex', 'hidden');
