@@ -245,7 +245,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.5 (跨越編輯修復)
+                Built for EXCEL Master Sync - v0.0.0.6 (主食定位與完整PWA)
             </div>
         </div>
     </div>
@@ -260,7 +260,7 @@
         }
 
         // 強制更新機制 (打破 PWA 快取陷阱)
-        const APP_VERSION = '0.0.0.5';
+        const APP_VERSION = '0.0.0.6';
         if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
             localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -292,8 +292,9 @@
                 '每日紀錄': ['主食', '副食', '零食', '外食', '日用雜貨', '治裝費', '醫療費', '交通費', '娛樂費', '喜慶・交際費', '其他'], 
                 '本月固定支出': ['電話費', '行動電話費', '房貸', '保險(個人)', '貸款(個人/房屋)', '稅金(燃料/房屋/所得)', '信用卡(玉山卡費)', '汽機車保養費', '股票定期定額(0050)', '股票定期定額(009816)']
             },
+
             'income': { 
-                '本月收入': ['薪水', '股息', '獎金'],
+                '本月收入': ['薪水(4/7~4/9加班3天)', '股息', '獎金'],
                 '每日紀錄': ['臨時收入']
             }
         };
