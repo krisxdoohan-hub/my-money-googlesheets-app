@@ -245,22 +245,22 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.6 (主食定位與完整PWA)
+                Built for EXCEL Master Sync - v0.0.0.7 (完美雙向同步發布版)
             </div>
         </div>
     </div>
 
     <!-- 核心腳本 -->
     <script>
-        // 註冊 Service Worker (PWA 不需修改 SW.js)
+        // 註冊 Service Worker
         if ('serviceWorker' in navigator) { 
             window.addEventListener('load', () => { 
                 navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW註冊失敗', err)); 
             }); 
         }
 
-        // 強制更新機制 (打破 PWA 快取陷阱)
-        const APP_VERSION = '0.0.0.6';
+        // 強制更新機制
+        const APP_VERSION = '0.0.0.7';
         if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
             localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -268,7 +268,7 @@
                     for(let registration of registrations) { registration.update(); }
                 });
             }
-            alert('系統系統已自動更新至最新版本 ' + APP_VERSION + '，即將為您重新載入！');
+            alert('系統已自動更新至最新版本 ' + APP_VERSION + '，即將為您重新載入！');
             location.reload(true);
         }
 
@@ -281,12 +281,10 @@
         let appPass = localStorage.getItem('excel_appPass') || "000000"; 
         let currentInput = "";
         let gasConfig = { url: '' };
-        let yearSheetMap = {}; // 跨年份自動化派發表
+        let yearSheetMap = {}; 
 
-        // 修正缺少的方法
         function closeAddModal() { toggleModal('addRecordModal', 'addRecordContent', false); }
 
-        // ★★★ 完美對齊 EXCEL 截圖中的最新分類 ★★★
         const categoryMap = {
             'expense': { 
                 '每日紀錄': ['主食', '副食', '零食', '外食', '日用雜貨', '治裝費', '醫療費', '交通費', '娛樂費', '喜慶・交際費', '其他'], 
@@ -294,7 +292,7 @@
             },
 
             'income': { 
-                '本月收入': ['薪水(4/7~4/9加班3天)', '股息', '獎金'],
+                '本月收入': ['薪水', '股息', '獎金'],
                 '每日紀錄': ['臨時收入']
             }
         };
@@ -338,7 +336,6 @@
         async function init() {
             clearPass();
             
-            // 【自動資料轉移】若發現有舊版一般記帳本的 localstorage 資料，自動搬移過來
             if (!localStorage.getItem('excel_expenseRecords') && localStorage.getItem('expenseRecords')) {
                 localStorage.setItem('excel_expenseRecords', localStorage.getItem('expenseRecords'));
                 if (localStorage.getItem('moneyAppGasConfig')) localStorage.setItem('excel_gasConfig', localStorage.getItem('moneyAppGasConfig'));
@@ -356,6 +353,12 @@
                 records.forEach(r => { if(!r.currency) r.currency = 'TWD'; if(!r.type) r.type = 'expense'; }); 
             }
             renderAll();
+
+            // 完美的雙向同步：當網頁載入（開機）時，馬上向雲端請求拉取最新資料，並更新版面
+            // 這解決了 A 手機打完，B 手機開機時資料沒同步的問題。
+            if (gasConfig.url) {
+                setTimeout(() => autoPullFromGAS(false), 500); 
+            }
         }
 
         function renderAll() {
@@ -442,7 +445,6 @@
             list.innerHTML = html + '</div>';
         }
 
-        // 修改/新增狀態管理
         function setRecordType(type) {
             currentModalRecordType = type;
             document.getElementById('btnTypeExp').className = `flex-1 py-2 text-sm font-bold rounded-lg ${type==='expense'?'bg-white text-red-500 shadow-sm':'text-gray-500'}`;
@@ -505,7 +507,7 @@
                 if (found) oldRec = JSON.parse(JSON.stringify(found));
             }
             
-            const rec = { id: editingRecordId || Date.now().toString(), type: currentModalRecordType, account: acc, date: d, category: cat, note: n||"無備註", amount: parseFloat(a), currency: 'TWD' };
+            const rec = { id: editingRecordId || (new Date().getTime().toString()), type: currentModalRecordType, account: acc, date: d, category: cat, note: n||"無備註", amount: parseFloat(a), currency: 'TWD' };
             if(editingRecordId) records[records.findIndex(x=>x.id===editingRecordId)] = rec; else records.push(rec);
             
             localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
@@ -527,7 +529,6 @@
             else { m.classList.add('opacity-0'); c.classList.add('translate-y-full'); setTimeout(()=>{m.classList.add('hidden'); m.classList.remove('flex');}, 300); }
         }
 
-        // ================= Google Sheets 同步中樞 =================
         function openSettings() { toggleModal('settingsModal', 'settingsContent', true); }
         function closeSettings() { toggleModal('settingsModal', 'settingsContent', false); }
         
@@ -540,6 +541,7 @@
             else { i.innerHTML='<i class="ph ph-cloud-warning text-2xl text-red-500 cursor-pointer"></i>'; }
         }
 
+        // 當單筆寫入時，傳送給 Google Apps Script，系統回傳完整的隱藏資料庫紀錄以確保本地100%同步
         async function syncSingleToGAS(act, rec, oldRec = null) {
             if(!gasConfig.url) return; updateCloudIcon('sync');
             let bodyData = { action: act, yearMap: yearSheetMap };
@@ -551,15 +553,40 @@
                 bodyData.oldRecord = oldRec;
                 bodyData.oldTargetSheetId = yearSheetMap[oldRec.date.substring(0, 4)] || '';
             }
-            try { await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify(bodyData) }); updateCloudIcon('ok'); } 
-            catch(e) { updateCloudIcon('err'); console.error(e); }
+            try { 
+                const res = await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify(bodyData) });
+                const result = await res.json();
+                if(result.records && Array.isArray(result.records)) {
+                    records = result.records;
+                    localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
+                    renderAll();
+                }
+                updateCloudIcon('ok'); 
+            } catch(e) { updateCloudIcon('err'); console.error(e); }
+        }
+
+        // 開機/手動按雲時，跟 Google 進行隱藏表同步
+        async function autoPullFromGAS(isManual = false) {
+            if(!gasConfig.url) {
+                if(isManual) alert("請先到設定輸入 Google Apps Script 網址！");
+                return;
+            }
+            updateCloudIcon('sync');
+            try { 
+                const res = await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify({action: 'pull', yearMap: yearSheetMap}) });
+                const result = await res.json();
+                if(result.records && Array.isArray(result.records)) {
+                    records = result.records; // 完全以雲端資料為基準 (因為多手機雙向同步)
+                    localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
+                    renderAll();
+                }
+                updateCloudIcon('ok');
+                if(isManual) alert("雲端資料同步完成！您的手機已具備最新資料，不會互相覆蓋了。");
+            } catch(e) { updateCloudIcon('err'); if(isManual) alert("同步失敗，狀態網址是否有被關閉？"); }
         }
 
         async function forceSyncUploadGAS() {
-            if(!gasConfig.url) return alert("請先到設定輸入 Google Apps Script 網址！");
-            updateCloudIcon('sync');
-            try { await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify({action: 'syncAll', records: records, yearMap: yearSheetMap}) }); updateCloudIcon('ok'); alert("所有資料已備份至雲端！"); } 
-            catch(e) { updateCloudIcon('err'); alert("備份失敗，請確認網址正確且允許 CORS"); }
+            autoPullFromGAS(true);
         }
 
         async function fixGoogleSheetsAAA() {
@@ -593,7 +620,7 @@
             reader.onload = ev => { 
                 try { 
                     const data = JSON.parse(ev.target.result); 
-                    if(Array.isArray(data)) { records = data; } // 舊版備份相容
+                    if(Array.isArray(data)) { records = data; } 
                     else { 
                         records = data.records || []; 
                         if(data.gasConfig) { gasConfig = data.gasConfig; localStorage.setItem('excel_gasConfig', JSON.stringify(gasConfig)); document.getElementById('cfg-gas-url').value = gasConfig.url || ''; }
@@ -606,7 +633,6 @@
             reader.readAsText(f); e.target.value = '';
         }
 
-        // ================= 密碼鎖 =================
         function inputPass(n) {
             if(currentInput.length>=6)return; currentInput+=n;
             const dots = document.getElementById('pass-dots').children;
