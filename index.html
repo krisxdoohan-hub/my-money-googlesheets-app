@@ -245,7 +245,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.9 (完美雙向同步發布版)
+                Built for EXCEL Master Sync - v0.0.0.10 (完美雙向同步發布版)
             </div>
         </div>
     </div>
@@ -260,7 +260,7 @@
         }
 
         // 強制更新機制
-        const APP_VERSION = '0.0.0.9';
+        const APP_VERSION = '0.0.0.10';
         if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
             localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -586,14 +586,16 @@
 
         // 開機/手動按雲時，跟 Google 進行隱藏表同步
         async function autoPullFromGAS(isManual = false) {
-            if(!gasConfig.url) {
-                if(isManual) alert("請先到設定輸入 Google Apps Script 網址！");
-                return;
-            }
-            updateCloudIcon('sync');
-            try { 
-                const res = await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify({action: 'pull', yearMap: yearSheetMap}) });
-                const result = await res.json();
+        if(!gasConfig.url) {
+            if(isManual) alert("請先到設定輸入 Google Apps Script 網址！");
+            return;
+        }
+        updateCloudIcon('sync');
+        try { 
+            const currentYear = currentViewDate.getFullYear().toString();
+            const sId = yearSheetMap[currentYear] || '';
+            const res = await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify({action: 'pull', yearMap: yearSheetMap, targetSheetId: sId}) });
+            const result = await res.json();
                 if(result.records && Array.isArray(result.records)) {
                     records = result.records; // 完全以雲端資料為基準 (因為多手機雙向同步)
                     localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
@@ -631,10 +633,44 @@
                         if(data.yearSheetMap) { yearSheetMap = data.yearSheetMap; localStorage.setItem('excel_yearMap', JSON.stringify(yearSheetMap)); renderYearMap(); }
                         if(data.appPass) { appPass = data.appPass; localStorage.setItem('excel_appPass', appPass); }
                     }
-                    localStorage.setItem('excel_expenseRecords', JSON.stringify(records)); renderAll(); alert('成功還原帳本與系統設定！'); 
+                    localStorage.setItem('excel_expenseRecords', JSON.stringify(records)); 
+                    renderAll(); 
+                    
+                    // 【優化】匯入成功後，如果已經有連線網址，自動觸發全量大包上傳雲端
+                    if (gasConfig.url) {
+                        alert('本地帳本還原成功！系統即將自動將所有歷史紀錄同步至雲端資料庫，請勿關閉網頁...');
+                        syncAllToGAS();
+                    } else {
+                        alert('成功還原帳本與系統設定！(注意：因未設定 GAS 網址，資料尚未同步至雲端)');
+                    }
                 } catch(err){ alert('檔案格式錯誤'); } 
             };
             reader.readAsText(f); e.target.value = '';
+        }
+
+        // 【新增安插】全量歷史紀錄同步推上雲端函數
+        async function syncAllToGAS() {
+            if(!gasConfig.url) return;
+            updateCloudIcon('sync');
+            try { 
+                const currentYear = currentViewDate.getFullYear().toString();
+                const sId = yearSheetMap[currentYear] || '';
+                const res = await fetch(gasConfig.url, { 
+                    method: 'POST', 
+                    body: JSON.stringify({ action: 'syncAll', records: records, yearMap: yearSheetMap, targetSheetId: sId }) 
+                });
+                const result = await res.json();
+                if(result.records && Array.isArray(result.records)) {
+                    records = result.records;
+                    localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
+                    renderAll();
+                }
+                updateCloudIcon('ok');
+                alert("🎉 所有歷史紀錄已完美同步至雲端 Excel 與 _DB 資料庫！現在您可以安心地跨平台記帳了。");
+            } catch(e) { 
+                updateCloudIcon('err'); 
+                alert("❌ 歷史紀錄同步雲端失敗，請確認您的網路連線或 GAS 網址是否正確。"); 
+            }
         }
 
         function inputPass(n) {
