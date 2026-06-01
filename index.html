@@ -245,7 +245,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.12 (完美雙向同步發布版)
+                Built for EXCEL Master Sync - v0.0.0.13 (完美雙向同步發布版)
             </div>
         </div>
     </div>
@@ -260,7 +260,7 @@
         }
 
         // 強制更新機制
-        const APP_VERSION = '0.0.0.12';
+        const APP_VERSION = '0.0.0.13';
         if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
             localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -433,6 +433,13 @@
             let html = '';
             let lastDate = '';
             const daysOfWeek = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+            
+            // 從本地端抓取由雲端 GAS 同步下來的假日清單，若無資料則預設為空陣列
+            let nationalHolidays = [];
+            const savedHolidays = localStorage.getItem('excel_holidays');
+            if (savedHolidays) {
+                nationalHolidays = JSON.parse(savedHolidays);
+            }
 
             targetRecords.forEach(r => {
                 const currentDate = r.date;
@@ -448,11 +455,18 @@
                     const dayNum = currentDate.substring(8);
                     const dayName = daysOfWeek[dateObj.getDay()];
                     
+                    // 判斷是否為週末 (0=週日, 6=週六) 或是存在於雲端同步的假日清單中
+                    const isHoliday = dateObj.getDay() === 0 || dateObj.getDay() === 6 || nationalHolidays.includes(currentDate);
+                    
+                    // 動態賦予顏色：放假為紅色，平日為原色
+                    const dateColorClass = isHoliday ? 'text-red-500' : 'text-gray-800';
+                    const dayColorClass = isHoliday ? 'text-red-500 font-bold' : 'text-gray-400 font-bold';
+                    
                     html += `
                     <div class="space-y-2 mb-4">
                         <div class="flex items-baseline gap-2 mt-4 px-1">
-                            <span class="text-xl font-black text-gray-800">${dayNum}</span>
-                            <span class="text-xs font-bold text-gray-400">${dayName}</span>
+                            <span class="text-xl font-black ${dateColorClass}">${dayNum}</span>
+                            <span class="text-xs ${dayColorClass}">${dayName}</span>
                         </div>
                         <div class="bg-white rounded-2xl shadow-sm border overflow-hidden divide-y divide-gray-50">`;
                     
@@ -639,6 +653,27 @@
                 if(result.records && Array.isArray(result.records)) {
                     records = result.records; // 完全以雲端資料為基準 (因為多手機雙向同步)
                     localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
+                    
+                    // 接收雲端傳來的假日清單，並由前端自動補零轉換格式
+                    if(result.holidays && Array.isArray(result.holidays)) {
+                        const formattedHolidays = result.holidays.map(dateStr => {
+                            let parts = [];
+                            const str = String(dateStr);
+                            if (str.includes('/')) {
+                                parts = str.split('/');
+                            } else if (str.includes('-')) {
+                                parts = str.split('-');
+                            }
+                            
+                            // 將接收到的 2026/1/1 切割並自動補零轉換為 2026-01-01
+                            if(parts.length >= 3) {
+                                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].substring(0, 2).padStart(2, '0')}`;
+                            }
+                            return str.substring(0, 10);
+                        });
+                        localStorage.setItem('excel_holidays', JSON.stringify(formattedHolidays));
+                    }
+                    
                     renderAll();
                 }
                 updateCloudIcon('ok');
