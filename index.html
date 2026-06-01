@@ -245,7 +245,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.11 (完美雙向同步發布版)
+                Built for EXCEL Master Sync - v0.0.0.12 (完美雙向同步發布版)
             </div>
         </div>
     </div>
@@ -260,7 +260,7 @@
         }
 
         // 強制更新機制
-        const APP_VERSION = '0.0.0.11';
+        const APP_VERSION = '0.0.0.12';
         if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
             localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -430,25 +430,59 @@
             const targetRecords = records.filter(r => r.date.startsWith(`${y}-${m}`) && r.type === filterType).sort((a,b)=>b.date.localeCompare(a.date));
             if(targetRecords.length === 0) { list.innerHTML = `<div class="p-8 text-center text-gray-400 text-sm border rounded-xl">無明細</div>`; return; }
 
-            let html = '<div class="bg-white rounded-2xl shadow-sm border overflow-hidden divide-y divide-gray-50">';
+            let html = '';
+            let lastDate = '';
+            const daysOfWeek = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+
             targetRecords.forEach(r => {
+                const currentDate = r.date;
+                
+                // 當日期與上一筆不同時，產生新的日期群組標頭
+                if (currentDate !== lastDate) {
+                    if (lastDate !== '') {
+                        html += '</div></div>'; // 閉合前一個日期的群組容器
+                    }
+                    
+                    // 穩健轉換日期並取得星期名稱
+                    const dateObj = new Date(currentDate.replace(/-/g, '/'));
+                    const dayNum = currentDate.substring(8);
+                    const dayName = daysOfWeek[dateObj.getDay()];
+                    
+                    html += `
+                    <div class="space-y-2 mb-4">
+                        <div class="flex items-baseline gap-2 mt-4 px-1">
+                            <span class="text-xl font-black text-gray-800">${dayNum}</span>
+                            <span class="text-xs font-bold text-gray-400">${dayName}</span>
+                        </div>
+                        <div class="bg-white rounded-2xl shadow-sm border overflow-hidden divide-y divide-gray-50">`;
+                    
+                    lastDate = currentDate;
+                }
+
                 let badgeClass = "bg-gray-100 text-gray-600";
                 if (r.account === '現金') badgeClass = "bg-[#fef08a]/50 text-yellow-700";
                 else if (r.account === '中信卡') badgeClass = "bg-[#a7f3d0]/50 text-emerald-700";
                 else if (r.account === '玉山卡') badgeClass = "bg-[#fbcfe8]/50 text-pink-700";
-                else if (r.account) badgeClass = "bg-emerald-50 text-emerald-600"; // 保留給舊資料的預設相容樣式
+                else if (r.account) badgeClass = "bg-emerald-50 text-emerald-600";
 
                 const accBadge = r.account ? `<span class="${badgeClass} px-1.5 py-0.5 rounded text-[10px] ml-2 font-bold">${r.account}</span>` : '';
+                
+                // 移除了內層重複顯示的月日字串，精準呈現備註內容
                 html += `
                 <div onclick="editRecord('${r.id}')" class="p-4 flex justify-between items-center hover:bg-gray-50 active:bg-gray-100 cursor-pointer">
                     <div>
                         <p class="text-sm font-bold text-gray-800">${r.category.replace('-', ' > ')} ${accBadge}</p>
-                        <p class="text-xs text-gray-400 font-mono mt-1">${r.date.substring(5)} | ${r.note}</p>
+                        <p class="text-xs text-gray-400 font-mono mt-1">${r.note}</p>
                     </div>
                     <span class="text-base ${getAmountColor(r.amount, r.type)}">${r.amount.toLocaleString()}</span>
                 </div>`;
             });
-            list.innerHTML = html + '</div>';
+
+            if (html !== '') {
+                html += '</div></div>'; // 閉合最後一個群組容器
+            }
+
+            list.innerHTML = html;
         }
 
         function setRecordType(type) {
