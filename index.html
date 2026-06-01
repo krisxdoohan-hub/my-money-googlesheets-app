@@ -150,8 +150,8 @@
                     <div class="flex gap-2" id="account-select-group">
                         <select id="input-account-main" class="w-full border-gray-200 rounded-xl p-3 bg-emerald-50/50 border focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm font-bold text-emerald-800">
                             <option value="現金">💵 現金</option>
-                            <option value="信用卡">💳 中信卡</option>
-                            <option value="信用卡">💳 玉山卡</option>
+                            <option value="中信卡">💳 中信卡</option>
+                            <option value="玉山卡">💳 玉山卡</option>
                         </select>
                     </div>
 
@@ -245,7 +245,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.10 (完美雙向同步發布版)
+                Built for EXCEL Master Sync - v0.0.0.11 (完美雙向同步發布版)
             </div>
         </div>
     </div>
@@ -260,7 +260,7 @@
         }
 
         // 強制更新機制
-        const APP_VERSION = '0.0.0.10';
+        const APP_VERSION = '0.0.0.11';
         if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
             localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -432,7 +432,13 @@
 
             let html = '<div class="bg-white rounded-2xl shadow-sm border overflow-hidden divide-y divide-gray-50">';
             targetRecords.forEach(r => {
-                const accBadge = r.account ? `<span class="bg-emerald-50 text-emerald-600 px-1 rounded text-[10px] ml-2 border">${r.account}</span>` : '';
+                let badgeClass = "bg-gray-100 text-gray-600";
+                if (r.account === '現金') badgeClass = "bg-[#fef08a]/50 text-yellow-700";
+                else if (r.account === '中信卡') badgeClass = "bg-[#a7f3d0]/50 text-emerald-700";
+                else if (r.account === '玉山卡') badgeClass = "bg-[#fbcfe8]/50 text-pink-700";
+                else if (r.account) badgeClass = "bg-emerald-50 text-emerald-600"; // 保留給舊資料的預設相容樣式
+
+                const accBadge = r.account ? `<span class="${badgeClass} px-1.5 py-0.5 rounded text-[10px] ml-2 font-bold">${r.account}</span>` : '';
                 html += `
                 <div onclick="editRecord('${r.id}')" class="p-4 flex justify-between items-center hover:bg-gray-50 active:bg-gray-100 cursor-pointer">
                     <div>
