@@ -245,7 +245,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.13 (完美雙向同步發布版)
+                Built for EXCEL Master Sync - v0.0.0.14 (完美雙向同步發布版)
             </div>
         </div>
     </div>
@@ -260,7 +260,7 @@
         }
 
         // 強制更新機制
-        const APP_VERSION = '0.0.0.13';
+        const APP_VERSION = '0.0.0.14';
         if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
             localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -627,15 +627,33 @@
                 bodyData.oldTargetSheetId = yearSheetMap[oldRec.date.substring(0, 4)] || '';
             }
             try { 
-                const res = await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify(bodyData) });
-                const result = await res.json();
-                if(result.records && Array.isArray(result.records)) {
-                    records = result.records;
-                    localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
-                    renderAll();
-                }
-                updateCloudIcon('ok'); 
-            } catch(e) { updateCloudIcon('err'); console.error(e); }
+                    const res = await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify(bodyData) });
+                    const result = await res.json();
+                    if(result.records && Array.isArray(result.records)) {
+                        records = result.records;
+                        localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
+                        
+                        if(result.holidays && Array.isArray(result.holidays)) {
+                            const formattedHolidays = result.holidays.map(dateStr => {
+                                let parts = [];
+                                const str = String(dateStr);
+                                if (str.includes('/')) {
+                                    parts = str.split('/');
+                                } else if (str.includes('-')) {
+                                    parts = str.split('-');
+                                }
+                                if(parts.length >= 3) {
+                                    return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].substring(0, 2).padStart(2, '0')}`;
+                                }
+                                return str.substring(0, 10);
+                            });
+                            localStorage.setItem('excel_holidays', JSON.stringify(formattedHolidays));
+                        }
+                        
+                        renderAll();
+                    }
+                    updateCloudIcon('ok'); 
+                } catch(e) { updateCloudIcon('err'); console.error(e); }
         }
 
         // 開機/手動按雲時，跟 Google 進行隱藏表同步
@@ -738,6 +756,24 @@
                 if(result.records && Array.isArray(result.records)) {
                     records = result.records;
                     localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
+                    
+                    if(result.holidays && Array.isArray(result.holidays)) {
+                        const formattedHolidays = result.holidays.map(dateStr => {
+                            let parts = [];
+                            const str = String(dateStr);
+                            if (str.includes('/')) {
+                                parts = str.split('/');
+                            } else if (str.includes('-')) {
+                                parts = str.split('-');
+                            }
+                            if(parts.length >= 3) {
+                                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].substring(0, 2).padStart(2, '0')}`;
+                            }
+                            return str.substring(0, 10);
+                        });
+                        localStorage.setItem('excel_holidays', JSON.stringify(formattedHolidays));
+                    }
+                    
                     renderAll();
                 }
                 updateCloudIcon('ok');
