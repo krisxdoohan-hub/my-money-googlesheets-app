@@ -472,10 +472,9 @@
                         dayColorClass = 'text-red-500 font-bold';
                     }
 
-                    // 右側帶有間隔的徽章生成 (ml-3 提供間距)
-                    if (sDay && sDay.name) {
-                        const badgeColor = isMemorial ? 'text-emerald-700 bg-emerald-100' : 'text-red-700 bg-red-100';
-                        badgeHtml = `<span class="ml-3 px-2 py-0.5 rounded-md text-[11px] font-bold tracking-widest shadow-sm border border-white/50 ${badgeColor}">${sDay.name}</span>`;
+                    // 右側帶有間隔的徽章生成 (ml-3 提供間距)：嚴格限制【僅紀念日】才顯示內容標籤
+                    if (isMemorial && sDay && sDay.name) {
+                        badgeHtml = `<span class="ml-3 px-2 py-0.5 rounded-md text-[11px] font-bold tracking-widest shadow-sm border border-white/50 text-emerald-700 bg-emerald-100">${sDay.name}</span>`;
                     }
                     
                     html += `
