@@ -455,26 +455,28 @@
                     const dayNum = currentDate.substring(8);
                     const dayName = daysOfWeek[dateObj.getDay()];
                     
-                    const sDay = specialDays.find(d => d.date === currentDate);
-                    const isMemorial = sDay && sDay.type === 'memorial';
-                    const isHoliday = dateObj.getDay() === 0 || dateObj.getDay() === 6 || (sDay && sDay.type === 'holiday');
+                    // 【修正】改用 filter 篩選出該日期的「所有」屬性，避免雙重身分(既是特休又是生日)被忽略
+                    const currentDayEvents = specialDays.filter(d => d.date === currentDate);
+                    const memorialEvent = currentDayEvents.find(d => d.type === 'memorial');
+                    const holidayEvent = currentDayEvents.find(d => d.type === 'holiday');
                     
+                    // 判斷是否為假日 (週末或存在於假日清單中)
+                    const isHoliday = dateObj.getDay() === 0 || dateObj.getDay() === 6 || holidayEvent;
+                    
+                    // 預設為平日顏色
                     let dateColorClass = 'text-gray-800';
                     let dayColorClass = 'text-gray-400 font-bold';
                     let badgeHtml = '';
 
-                    // 動態賦予顏色：紀念日為綠色，放假為紅色，平日為原色
-                    if (isMemorial) {
-                        dateColorClass = 'text-emerald-600';
-                        dayColorClass = 'text-emerald-600 font-bold';
-                    } else if (isHoliday) {
+                    // 【修正】只有「假日或週末」會將左側數字與星期變成紅色，紀念日不再干涉此處顏色
+                    if (isHoliday) {
                         dateColorClass = 'text-red-500';
                         dayColorClass = 'text-red-500 font-bold';
                     }
 
-                    // 右側帶有間隔的徽章生成 (ml-3 提供間距)：嚴格限制【僅紀念日】才顯示內容標籤
-                    if (isMemorial && sDay && sDay.name) {
-                        badgeHtml = `<span class="ml-3 px-2 py-0.5 rounded-md text-[11px] font-bold tracking-widest shadow-sm border border-white/50 text-emerald-700 bg-emerald-100">${sDay.name}</span>`;
+                    // 【修正】徽章獨立判斷：只要有紀念日屬性，就獨立在右方安插綠色名稱標籤
+                    if (memorialEvent && memorialEvent.name) {
+                        badgeHtml = `<span class="ml-3 px-2 py-0.5 rounded-md text-[11px] font-bold tracking-widest shadow-sm border border-white/50 text-emerald-700 bg-emerald-100">${memorialEvent.name}</span>`;
                     }
                     
                     html += `
