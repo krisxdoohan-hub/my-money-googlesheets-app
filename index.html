@@ -245,7 +245,7 @@
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
             <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.14 (完美雙向同步發布版)
+                Built for EXCEL Master Sync - v0.0.0.15 (完美雙向同步發布版)
             </div>
         </div>
     </div>
@@ -260,7 +260,7 @@
         }
 
         // 強制更新機制
-        const APP_VERSION = '0.0.0.14';
+        const APP_VERSION = '0.0.0.15';
         if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
             localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -435,10 +435,10 @@
             const daysOfWeek = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
             
             // 從本地端抓取由雲端 GAS 同步下來的假日清單，若無資料則預設為空陣列
-            let nationalHolidays = [];
+            let specialDays = [];
             const savedHolidays = localStorage.getItem('excel_holidays');
             if (savedHolidays) {
-                nationalHolidays = JSON.parse(savedHolidays);
+                specialDays = JSON.parse(savedHolidays);
             }
 
             targetRecords.forEach(r => {
@@ -455,18 +455,35 @@
                     const dayNum = currentDate.substring(8);
                     const dayName = daysOfWeek[dateObj.getDay()];
                     
-                    // 判斷是否為週末 (0=週日, 6=週六) 或是存在於雲端同步的假日清單中
-                    const isHoliday = dateObj.getDay() === 0 || dateObj.getDay() === 6 || nationalHolidays.includes(currentDate);
+                    const sDay = specialDays.find(d => d.date === currentDate);
+                    const isMemorial = sDay && sDay.type === 'memorial';
+                    const isHoliday = dateObj.getDay() === 0 || dateObj.getDay() === 6 || (sDay && sDay.type === 'holiday');
                     
-                    // 動態賦予顏色：放假為紅色，平日為原色
-                    const dateColorClass = isHoliday ? 'text-red-500' : 'text-gray-800';
-                    const dayColorClass = isHoliday ? 'text-red-500 font-bold' : 'text-gray-400 font-bold';
+                    let dateColorClass = 'text-gray-800';
+                    let dayColorClass = 'text-gray-400 font-bold';
+                    let badgeHtml = '';
+
+                    // 動態賦予顏色：紀念日為綠色，放假為紅色，平日為原色
+                    if (isMemorial) {
+                        dateColorClass = 'text-emerald-600';
+                        dayColorClass = 'text-emerald-600 font-bold';
+                    } else if (isHoliday) {
+                        dateColorClass = 'text-red-500';
+                        dayColorClass = 'text-red-500 font-bold';
+                    }
+
+                    // 右側帶有間隔的徽章生成 (ml-3 提供間距)
+                    if (sDay && sDay.name) {
+                        const badgeColor = isMemorial ? 'text-emerald-700 bg-emerald-100' : 'text-red-700 bg-red-100';
+                        badgeHtml = `<span class="ml-3 px-2 py-0.5 rounded-md text-[11px] font-bold tracking-widest shadow-sm border border-white/50 ${badgeColor}">${sDay.name}</span>`;
+                    }
                     
                     html += `
                     <div class="space-y-2 mb-4">
                         <div class="flex items-baseline gap-2 mt-4 px-1">
                             <span class="text-xl font-black ${dateColorClass}">${dayNum}</span>
                             <span class="text-xs ${dayColorClass}">${dayName}</span>
+                            ${badgeHtml}
                         </div>
                         <div class="bg-white rounded-2xl shadow-sm border overflow-hidden divide-y divide-gray-50">`;
                     
@@ -634,18 +651,19 @@
                         localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
                         
                         if(result.holidays && Array.isArray(result.holidays)) {
-                            const formattedHolidays = result.holidays.map(dateStr => {
+                            const formattedHolidays = result.holidays.map(item => {
                                 let parts = [];
-                                const str = String(dateStr);
+                                const str = String(item.date);
+                                let fDate = str.substring(0, 10);
                                 if (str.includes('/')) {
                                     parts = str.split('/');
                                 } else if (str.includes('-')) {
                                     parts = str.split('-');
                                 }
                                 if(parts.length >= 3) {
-                                    return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].substring(0, 2).padStart(2, '0')}`;
+                                    fDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].substring(0, 2).padStart(2, '0')}`;
                                 }
-                                return str.substring(0, 10);
+                                return { date: fDate, name: item.name, type: item.type };
                             });
                             localStorage.setItem('excel_holidays', JSON.stringify(formattedHolidays));
                         }
@@ -674,9 +692,10 @@
                     
                     // 接收雲端傳來的假日清單，並由前端自動補零轉換格式
                     if(result.holidays && Array.isArray(result.holidays)) {
-                        const formattedHolidays = result.holidays.map(dateStr => {
+                        const formattedHolidays = result.holidays.map(item => {
                             let parts = [];
-                            const str = String(dateStr);
+                            const str = String(item.date);
+                            let fDate = str.substring(0, 10);
                             if (str.includes('/')) {
                                 parts = str.split('/');
                             } else if (str.includes('-')) {
@@ -685,9 +704,9 @@
                             
                             // 將接收到的 2026/1/1 切割並自動補零轉換為 2026-01-01
                             if(parts.length >= 3) {
-                                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].substring(0, 2).padStart(2, '0')}`;
+                                fDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].substring(0, 2).padStart(2, '0')}`;
                             }
-                            return str.substring(0, 10);
+                            return { date: fDate, name: item.name, type: item.type };
                         });
                         localStorage.setItem('excel_holidays', JSON.stringify(formattedHolidays));
                     }
@@ -758,18 +777,19 @@
                     localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
                     
                     if(result.holidays && Array.isArray(result.holidays)) {
-                        const formattedHolidays = result.holidays.map(dateStr => {
+                        const formattedHolidays = result.holidays.map(item => {
                             let parts = [];
-                            const str = String(dateStr);
+                            const str = String(item.date);
+                            let fDate = str.substring(0, 10);
                             if (str.includes('/')) {
                                 parts = str.split('/');
                             } else if (str.includes('-')) {
                                 parts = str.split('-');
                             }
                             if(parts.length >= 3) {
-                                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].substring(0, 2).padStart(2, '0')}`;
+                                fDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].substring(0, 2).padStart(2, '0')}`;
                             }
-                            return str.substring(0, 10);
+                            return { date: fDate, name: item.name, type: item.type };
                         });
                         localStorage.setItem('excel_holidays', JSON.stringify(formattedHolidays));
                     }
