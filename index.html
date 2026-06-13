@@ -567,18 +567,29 @@
                 let dayColor = 'text-[#6b6255]';
                 let tagHtml = '';
                 
-                const holidayMatch = holidays.find(h => h.date === r.date);
-                if (holidayMatch) {
-                    if (holidayMatch.type === 'holiday') {
-                        dateColor = 'text-[#c07c7c]'; // 使用與原版支出相同的紅色系
+                // 改用 filter 抓出該日期的「所有」節日與紀念日
+                const dailyEvents = holidays.filter(h => h.date === r.date);
+                
+                if (dailyEvents.length > 0) {
+                    // 分別判斷這天是否包含「假日」或「紀念日」
+                    const isHoliday = dailyEvents.some(h => h.type === 'holiday');
+                    const anniversary = dailyEvents.find(h => h.type !== 'holiday'); // 取第一個非假日的事件作為標籤
+
+                    // 1. 決定顏色：只要這天是假日（或週末），就優先用紅色；如果只是純紀念日，才用藍色
+                    if (isHoliday || dateObj.getDay() === 0 || dateObj.getDay() === 6) {
+                        dateColor = 'text-[#c07c7c]';
                         dayColor = 'text-[#c07c7c]/80';
-                    } else {
-                        // 紀念日或其他類型，改為藍色系並加上明顯的浮動標籤
-                        dateColor = 'text-[#5b83a6]'; 
+                    } else if (anniversary) {
+                        dateColor = 'text-[#5b83a6]';
                         dayColor = 'text-[#5b83a6]/80';
-                        tagHtml = `<div class="absolute -top-2.5 -right-2 bg-[#5b83a6] text-white text-[8px] px-1.5 py-0.5 rounded-md shadow-sm whitespace-nowrap z-10 border border-white/80 tracking-widest font-bold" style="transform: scale(0.85); transform-origin: top right;">${holidayMatch.name}</div>`;
+                    }
+
+                    // 2. 決定標籤：只要這天有紀念日屬性，無論是不是假日，都掛上專屬小標籤
+                    if (anniversary) {
+                        tagHtml = `<div class="absolute -top-2.5 -right-2 bg-[#5b83a6] text-white text-[8px] px-1.5 py-0.5 rounded-md shadow-sm whitespace-nowrap z-10 border border-white/80 tracking-widest font-bold" style="transform: scale(0.85); transform-origin: top right;">${anniversary.name}</div>`;
                     }
                 } else if (dateObj.getDay() === 0 || dateObj.getDay() === 6) {
+                    // 什麼事件都沒有的普通週末
                     dateColor = 'text-[#c07c7c]';
                     dayColor = 'text-[#c07c7c]/80';
                 }
