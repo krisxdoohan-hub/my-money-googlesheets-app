@@ -638,11 +638,16 @@
                 if (r.c_currency === 'JPY') displayNote = displayNote.replace(/^\[JPY [\d,]+\]\s*/, '');
                 if (!displayNote || displayNote === '無備註') displayNote = (r.category || '').split('-').pop() || '未分類';
 
-                const mainCat = (r.category || '').split('-')[0] || '其他';
+                const fullCat = r.category || '';
                 let catIcon = 'ph-receipt';
-                if(mainCat.includes('食')) catIcon = 'ph-bowl-food';
-                if(mainCat.includes('交通') || displayNote.includes('JR')) catIcon = 'ph-train';
-                if(mainCat.includes('購物') || displayNote.includes('Bic')) catIcon = 'ph-shopping-bag';
+                // 擴大關鍵字比對範圍至完整類別與備註，確保圖示能正確對應
+                if(fullCat.includes('食') || fullCat.includes('飲') || fullCat.includes('餐') || displayNote.includes('餐') || displayNote.includes('麵') || displayNote.includes('麥當勞')) catIcon = 'ph-bowl-food';
+                else if(fullCat.includes('交通') || fullCat.includes('TPass') || fullCat.includes('車') || displayNote.includes('JR') || displayNote.includes('捷運')) catIcon = 'ph-train';
+                else if(fullCat.includes('雜貨') || fullCat.includes('治裝') || fullCat.includes('購物') || displayNote.includes('Bic')) catIcon = 'ph-shopping-bag';
+                else if(fullCat.includes('電話') || fullCat.includes('網')) catIcon = 'ph-device-mobile';
+                else if(fullCat.includes('醫療') || fullCat.includes('保險')) catIcon = 'ph-pill';
+                else if(fullCat.includes('娛樂')) catIcon = 'ph-game-controller';
+                else if(fullCat.includes('卡費') || fullCat.includes('貸款') || fullCat.includes('房貸')) catIcon = 'ph-bank';
                 if(r.type === 'income') catIcon = 'ph-wallet';
                 
                 const bgCircleColor = r.type === 'expense' ? 'bg-[#f3e5e1] text-[#c07c7c]' : 'bg-[#e2eadf] text-[#7a8b76]';
@@ -650,7 +655,13 @@
                 const amtColor = r.type === 'expense' ? 'text-[#c07c7c]' : 'text-[#7a8b76]';
                 
                 let currencyDisp = r.c_currency === 'TWD' ? 'NT$ ' : '¥ ';
-                let accIcon = r.account === '現金' ? 'ph-wallet' : (r.account === '玉山銀行' ? 'ph-bank' : 'ph-credit-card');
+                
+                // 修正帳戶圖示判斷，改用模糊比對涵蓋「玉山卡」與「中信卡」
+                let accIcon = 'ph-wallet';
+                if (r.account) {
+                    if (r.account.includes('玉山')) accIcon = 'ph-bank';
+                    else if (r.account.includes('卡')) accIcon = 'ph-credit-card';
+                }
                 
                 html += `
                 <div onclick="editRecord('${r.id}')" class="glass-panel p-3.5 rounded-[20px] flex justify-between items-center hover:bg-white/90 cursor-pointer shadow-sm active:scale-[0.98] transition-transform mt-2">
