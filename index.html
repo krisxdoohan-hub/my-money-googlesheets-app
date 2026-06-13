@@ -4,30 +4,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>跨平台記帳本 (EXCEL完美對齊版) </title>
-    <!-- 確保可以被 PWA 讀取安裝 -->
     <link rel="manifest" href="./manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&display=swap');
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        body { overscroll-behavior-y: none; -webkit-overflow-scrolling: touch; background-color: #f8fafc; }
+        body { 
+            overscroll-behavior-y: none; 
+            -webkit-overflow-scrolling: touch; 
+            background-color: #f5f0e6; 
+            background-image: radial-gradient(#e2d5c4 1px, transparent 1px); 
+            background-size: 24px 24px;
+        }
+        .font-serif-tc { font-family: 'Noto Serif TC', serif; }
+        .glass-panel { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.9); }
+        .bottom-nav { background: linear-gradient(to top, #f5f0e6 85%, rgba(245, 240, 230, 0)); }
+        
         .spinner { border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s ease-in-out infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .donut-chart { width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(#e2e8f0 0% 100%); position: relative; }
         .donut-chart::before { content: ""; position: absolute; inset: 20px; background-color: #ffffff; border-radius: 50%; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
     </style>
 </head>
-<body class="text-gray-800 font-sans antialiased h-[100dvh] flex flex-col relative overflow-hidden">
+<body class="text-[#4a4238] font-sans antialiased h-[100dvh] flex flex-col relative overflow-hidden">
 
-    <!-- 讀取遮罩 -->
     <div id="loading-overlay" class="fixed inset-0 bg-indigo-900/80 z-[100] hidden flex-col justify-center items-center text-white backdrop-blur-sm">
         <div class="spinner mb-4 w-10 h-10 border-4"></div>
         <p id="loading-text" class="font-bold tracking-wider">處理中...</p>
     </div>
 
-    <!-- 密碼解鎖畫面 (預設顯示) -->
     <div id="lock-screen" class="fixed inset-0 bg-indigo-950 z-[200] flex flex-col justify-center items-center text-white p-6 transition-all duration-300">
         <div class="w-full max-w-xs text-center space-y-10">
             <div class="flex flex-col items-center gap-4">
@@ -64,70 +72,77 @@
         </div>
     </div>
 
-    <!-- 標題列 -->
-    <header class="bg-white px-4 py-3 shadow-sm z-30 flex justify-between items-center flex-shrink-0">
-        <div class="flex items-center gap-2 text-indigo-700">
-            <i class="ph ph-wallet text-2xl"></i>
-            <span class="font-bold tracking-widest">EXCEL對接版</span>
+    <header class="px-6 pt-10 pb-4 z-30 flex justify-between items-start flex-shrink-0 relative">
+        <div class="flex flex-col gap-1">
+            <div class="flex items-center gap-2">
+                <h1 class="text-2xl font-black font-serif-tc tracking-widest text-[#4a4238]">私人記帳本</h1>
+                <div class="bg-[#ba4c45] text-white text-[8px] px-1 py-0.5 rounded-sm font-serif-tc shadow-sm" style="writing-mode: vertical-lr;">足跡</div>
+            </div>
+            <span class="text-sm font-serif-tc text-[#6b6255] tracking-widest">京都旅人財務手帳</span>
         </div>
         <div class="flex items-center gap-3">
-            <button id="cloud-status-icon" onclick="forceSyncUploadGAS()" class="text-gray-300 transition-colors p-1.5 rounded-full hover:bg-gray-100 focus:outline-none">
-                <i class="ph ph-cloud-slash text-2xl"></i>
-            </button>
-            <button onclick="openSettings()" class="text-gray-500 hover:text-indigo-600 transition-colors p-1.5 rounded-full hover:bg-indigo-50 focus:outline-none">
-                <i class="ph ph-gear text-2xl"></i>
+            <button id="cloud-status-icon" onclick="forceSyncUploadGAS()" class="flex items-center gap-1 bg-white/70 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm border border-white focus:outline-none hover:bg-white transition">
+                <i class="ph-fill ph-cloud-check text-[#7a8b76] text-lg"></i>
+                <div class="flex flex-col items-start"><span class="text-[9px] font-bold text-[#6b6255] leading-none">已同步</span><span class="text-[8px] text-[#a39a8c] leading-none mt-0.5">剛剛</span></div>
             </button>
         </div>
     </header>
 
-    <main class="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 relative">
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6 pb-6 relative">
         <div class="max-w-5xl mx-auto">
-            <!-- 日期控制 -->
-            <header class="flex justify-between items-center mb-6">
-                <div class="flex items-center gap-3 mx-auto">
-                    <button onclick="changeMonth(-1)" class="p-2 bg-white rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-transform"><i class="ph ph-caret-left text-gray-400"></i></button>
-                    <div class="text-center min-w-[120px]">
-                        <p id="currentYearDisplay" class="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">2026</p>
-                        <button onclick="resetToToday()" class="group flex flex-col items-center w-full focus:outline-none">
-                            <h1 id="currentMonthDisplay" class="text-2xl font-black text-gray-800 leading-none group-active:scale-95 transition-transform">4月</h1>
-                            <span id="backTodayBtn" class="hidden text-[8px] font-black text-indigo-500 mt-1 bg-indigo-50 px-1.5 py-0.5 rounded uppercase tracking-tighter">回到本月</span>
-                        </button>
-                    </div>
-                    <button onclick="changeMonth(1)" class="p-2 bg-white rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-transform"><i class="ph ph-caret-right text-gray-400"></i></button>
+            
+            <header class="hidden mb-6"><p id="currentYearDisplay"></p><h1 id="currentMonthDisplay"></h1><span id="backTodayBtn"></span></header>
+
+            <section id="currencyDashboard" class="flex overflow-x-auto gap-4 pb-2 no-scrollbar scroll-smooth snap-x"></section>
+            <div id="currencyIndicators" class="flex justify-center gap-2 mb-4"></div>
+
+            <div class="grid grid-cols-3 gap-2 mb-6 px-1">
+                <button onclick="openAddModal()" class="glass-panel rounded-2xl p-3 flex flex-col items-center justify-center gap-2 shadow-sm active:scale-95 transition-transform focus:outline-none">
+                    <div class="w-10 h-10 rounded-full bg-[#7a8b76]/10 flex items-center justify-center border border-white"><i class="ph-fill ph-plus-circle text-2xl text-[#7a8b76]"></i></div>
+                    <span class="text-[10px] font-bold text-[#6b6255]">新增記帳</span>
+                </button>
+                <button onclick="forceSyncUploadGAS()" class="glass-panel rounded-2xl p-3 flex flex-col items-center justify-center gap-2 shadow-sm active:scale-95 transition-transform focus:outline-none">
+                    <div class="w-10 h-10 rounded-full bg-[#5b83a6]/10 flex items-center justify-center border border-white"><i class="ph-fill ph-cloud-arrow-up text-2xl text-[#5b83a6]"></i></div>
+                    <span class="text-[10px] font-bold text-[#6b6255]">雲端同步</span>
+                </button>
+                <button onclick="openSettings()" class="glass-panel rounded-2xl p-3 flex flex-col items-center justify-center gap-2 shadow-sm active:scale-95 transition-transform focus:outline-none">
+                    <div class="w-10 h-10 rounded-full bg-[#b8a37e]/10 flex items-center justify-center border border-white"><i class="ph-fill ph-squares-four text-2xl text-[#b8a37e]"></i></div>
+                    <span class="text-[10px] font-bold text-[#6b6255]">更多功能</span>
+                </button>
+            </div>
+
+            <div class="flex items-center justify-between mt-8 mb-3 px-1">
+                <div class="flex items-center gap-2">
+                    <i class="ph-fill ph-flower-lotus text-[#b8a37e] text-lg"></i>
+                    <h2 class="text-sm font-bold text-[#4a4238] tracking-widest">最新紀錄</h2>
                 </div>
-            </header>
+                <button class="text-[10px] text-[#6b6255] flex items-center gap-1 active:scale-95 tracking-widest font-bold">查看全部 <i class="ph ph-caret-right"></i></button>
+            </div>
+            
+            <div id="historyList" class="space-y-3 mb-6"></div>
 
-            <section id="currencyDashboard" class="flex overflow-x-auto gap-4 pb-4 mb-4 no-scrollbar scroll-smooth snap-x"></section>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="space-y-6">
-                    <div class="bg-white p-6 rounded-[24px] shadow-sm border border-gray-100">
-                        <div class="flex justify-between items-center mb-6">
-                            <div class="flex items-center gap-2"><i class="ph ph-chart-pie-slice text-indigo-500 text-xl"></i><h2 class="text-sm font-bold text-gray-800">類別分佈</h2></div>
-                        </div>
-                        <div id="analyticsContent" class="flex flex-col items-center"></div>
+            <div class="grid grid-cols-2 gap-3 mb-12 px-1">
+                <div class="glass-panel rounded-2xl p-4 shadow-sm flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xs font-bold text-[#4a4238] tracking-widest">本月支出分類</h3>
+                        <i class="ph ph-caret-right text-[#a39a8c]"></i>
                     </div>
+                    <div id="analyticsContent" class="space-y-2.5 flex-1"></div>
                 </div>
 
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between sticky top-0 bg-[#f8fafc]/90 backdrop-blur-md py-2 z-10">
-                        <div class="flex items-center gap-2"><i class="ph ph-list-dashes text-indigo-500 text-xl"></i><h2 class="text-sm font-bold text-gray-800 tracking-tight">明細清單</h2></div>
-                        <div class="flex bg-gray-200 p-1 rounded-xl shadow-inner">
-                            <button onclick="setFilterType('expense')" id="filterExp" class="px-4 py-1 text-xs font-bold rounded-lg transition-all bg-white text-indigo-600 shadow-sm">支出</button>
-                            <button onclick="setFilterType('income')" id="filterInc" class="px-4 py-1 text-xs font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700">收入</button>
-                        </div>
+                <div class="glass-panel rounded-2xl p-4 shadow-sm flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xs font-bold text-[#4a4238] tracking-widest">帳戶總覽</h3>
+                        <i class="ph ph-caret-right text-[#a39a8c]"></i>
                     </div>
-                    <div id="historyList" class="space-y-4 pb-6"></div>
+                    <div id="accountSummaryContent" class="space-y-3 flex-1 flex items-center justify-center">
+                        <span class="text-[11px] text-[#a39a8c] tracking-widest font-bold">未連結雲端資料庫</span>
+                    </div>
                 </div>
             </div>
         </div>
     </main>
 
-    <button onclick="openAddModal()" class="fixed bottom-6 right-6 bg-indigo-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:bg-indigo-700 active:scale-90 transition-transform z-40 focus:outline-none">
-        <i class="ph ph-plus text-2xl"></i>
-    </button>
-
-    <!-- 新增/編輯紀錄 Modal -->
     <div id="addRecordModal" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center items-center p-0 sm:p-4 transition-opacity duration-300 opacity-0">
         <div class="bg-white w-full sm:max-w-md rounded-t-[32px] sm:rounded-[24px] shadow-2xl transform translate-y-full sm:translate-y-0 transition-transform duration-300" id="addRecordContent">
             <div class="p-6">
@@ -171,7 +186,8 @@
                     </div>
                     <div class="flex gap-2">
                         <select id="input-currency" class="w-1/3 border-gray-200 rounded-xl p-3 bg-indigo-50/50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm font-bold text-indigo-700">
-                            <option value="TWD">TWD</option>
+                            <option value="TWD">💵 TWD</option>
+                            <option value="JPY">💴 JPY</option>
                         </select>
                         <input type="number" id="input-amount" placeholder="金額" class="w-2/3 border-gray-200 rounded-xl p-3 bg-gray-50 border focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xl font-bold text-gray-800 tracking-wider">
                     </div>
@@ -189,7 +205,6 @@
         </div>
     </div>
 
-    <!-- 設定 Modal -->
     <div id="settingsModal" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 hidden flex-col justify-end sm:justify-center items-center p-0 sm:p-4 transition-opacity duration-300 opacity-0">
         <div class="bg-white w-full sm:max-w-md rounded-t-[32px] sm:rounded-[24px] shadow-2xl transform translate-y-full sm:translate-y-0 transition-transform duration-300 flex flex-col max-h-[90vh]" id="settingsContent">
             <div class="p-6 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
@@ -198,7 +213,6 @@
             </div>
             
             <div class="p-6 overflow-y-auto flex-1 space-y-6">
-                <!-- Google Sheets -->
                 <div class="bg-emerald-50/50 rounded-2xl border border-emerald-100 p-4">
                     <h4 class="font-bold text-emerald-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-google-logo text-emerald-500 text-lg"></i> Google Sheets 對接網址</h4>
                     <div class="space-y-3">
@@ -209,7 +223,6 @@
                     </div>
                 </div>
 
-                <!-- 跨年份檔案路由設定 -->
                 <div class="bg-blue-50/50 rounded-2xl border border-blue-100 p-4">
                     <h4 class="font-bold text-blue-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-files text-blue-500 text-lg"></i> 各年度 Excel 檔案路由 (File ID)</h4>
                     <div id="year-id-list" class="space-y-2 mb-3"></div>
@@ -232,8 +245,6 @@
                     </div>
                 </div>
 
-                
-
                 <div class="bg-indigo-50 rounded-2xl border border-indigo-100 p-4">
                     <h4 class="font-bold text-indigo-900 text-sm flex items-center gap-2 mb-3"><i class="ph ph-shield-check text-indigo-500 text-lg"></i> 解鎖密碼</h4>
                     <div class="flex gap-2">
@@ -244,23 +255,30 @@
             
                 <div id="settings-msg" class="text-center text-xs font-bold opacity-0 transition-opacity duration-300 h-4"></div>
             </div>
-            <div class="p-4 text-center text-[10px] text-gray-400 font-medium border-t border-gray-50 bg-gray-50 rounded-b-[24px]">
-                Built for EXCEL Master Sync - v0.0.0.15 (完美雙向同步發布版)
-            </div>
         </div>
     </div>
 
-    <!-- 核心腳本 -->
+    
     <script>
-        // 註冊 Service Worker
-        if ('serviceWorker' in navigator) { 
+        function toggleModal(mId, cId, show) {
+            const m = document.getElementById(mId), c = document.getElementById(cId);
+            if(show) { m.classList.remove('hidden'); m.classList.add('flex'); requestAnimationFrame(()=>{m.classList.remove('opacity-0'); c.classList.remove('translate-y-full');}); } 
+            else { m.classList.add('opacity-0'); c.classList.add('translate-y-full'); setTimeout(()=>{m.classList.add('hidden'); m.classList.remove('flex');}, 300); }
+        }
+
+        function openSettings() { toggleModal('settingsModal', 'settingsContent', true); }
+        function closeSettings() { toggleModal('settingsModal', 'settingsContent', false); }
+
+        function saveGasConfig() { gasConfig.url = document.getElementById('cfg-gas-url').value.trim(); localStorage.setItem('excel_gasConfig', JSON.stringify(gasConfig)); document.getElementById('settings-msg').innerText="已儲存"; document.getElementById('settings-msg').style.opacity=1; }
+        
+        function updateCloudIcon(st) { 
             window.addEventListener('load', () => { 
                 navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW註冊失敗', err)); 
             }); 
         }
 
         // 強制更新機制
-        const APP_VERSION = '0.0.0.15';
+        const APP_VERSION = '0.0.0.16';
         if (localStorage.getItem('excel_appVersion') !== APP_VERSION) {
             localStorage.setItem('excel_appVersion', APP_VERSION);
             if ('serviceWorker' in navigator) {
@@ -282,6 +300,20 @@
         let currentInput = "";
         let gasConfig = { url: '' };
         let yearSheetMap = {}; 
+        let dashboardObserver = null;
+
+        function getComputedRecord(r) {
+            let curr = 'TWD';
+            let amt = r.amount;
+            if (r.note && r.note.startsWith('[JPY ')) {
+                curr = 'JPY';
+                const match = r.note.match(/^\[JPY ([\d,]+)\]/);
+                if (match) {
+                    amt = parseFloat(match[1].replace(/,/g, ''));
+                }
+            }
+            return { ...r, c_currency: curr, c_amount: amt };
+        }
 
         function closeAddModal() { toggleModal('addRecordModal', 'addRecordContent', false); }
 
@@ -354,8 +386,6 @@
             }
             renderAll();
 
-            // 完美的雙向同步：當網頁載入（開機）時，馬上向雲端請求拉取最新資料，並更新版面
-            // 這解決了 A 手機打完，B 手機開機時資料沒同步的問題。
             if (gasConfig.url) {
                 setTimeout(() => autoPullFromGAS(false), 500); 
             }
@@ -376,23 +406,100 @@
 
         function renderCurrencyDashboard() {
             const y = currentViewDate.getFullYear(), m = String(currentViewDate.getMonth() + 1).padStart(2, '0');
-            const monthRecords = records.filter(r => r.date.startsWith(`${y}-${m}`) && r.currency === currentCurrency);
-            const inc = monthRecords.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-            const exp = monthRecords.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-            const net = inc - exp;
+            let html = '';
+            
+            ['TWD', 'JPY'].forEach(curr => {
+                const targetRecords = records.map(getComputedRecord).filter(r => r.date.startsWith(`${y}-${m}`) && r.c_currency === curr);
+                const inc = targetRecords.filter(r => r.type === 'income').reduce((s, r) => s + r.c_amount, 0);
+                const exp = targetRecords.filter(r => r.type === 'expense').reduce((s, r) => s + r.c_amount, 0);
+                const net = inc - exp;
 
-            document.getElementById('currencyDashboard').innerHTML = `
-                <div class="min-w-full snp-center p-5 rounded-[24px] bg-indigo-600 text-white border border-indigo-500 shadow-sm">
-                    <div class="flex justify-between items-center mb-4">
-                        <span class="text-xs font-black tracking-widest text-indigo-200">${currentCurrency}</span>
-                        <i class="ph ph-coins text-lg bg-white/20 p-1.5 rounded-full"></i>
-                    </div>
-                    <div><p class="text-xs font-medium mb-1 opacity-80">本月結餘</p><h3 class="text-3xl font-black">${net.toLocaleString()}</h3></div>
-                    <div class="flex items-center gap-4 mt-4 pt-4 border-t border-indigo-500/50">
-                        <div class="flex-1"><p class="text-[10px] font-bold opacity-60">收入</p><p class="text-sm font-bold mt-0.5">${inc.toLocaleString()}</p></div>
-                        <div class="flex-1"><p class="text-[10px] font-bold opacity-60">支出</p><p class="text-sm font-bold mt-0.5">${exp.toLocaleString()}</p></div>
-                    </div>
-                </div>`;
+                let bgClass = curr === 'TWD' ? 'bg-[#7a8b76]' : 'bg-[#ba4c45]'; 
+                let titleText = curr === 'TWD' ? 'TWD' : 'JPY';
+                
+                let bgColorCode = curr === 'TWD' ? '#7a8b76' : '#ba4c45';
+                let expRatio = inc > 0 ? Math.round((exp / inc) * 100) : (exp > 0 ? 100 : 0);
+                let displayRatio = expRatio > 100 ? 100 : expRatio;
+                let ratioDeg = Math.round((displayRatio / 100) * 360);
+
+                html += `
+                    <div class="min-w-full snap-center p-6 rounded-[24px] ${bgClass} text-white shadow-md transition-transform duration-300 relative overflow-hidden" data-currency="${curr}">
+                        <div class="absolute right-[-20px] bottom-[-20px] opacity-10">
+                            <i class="ph-fill ph-circle text-[180px]"></i>
+                        </div>
+                        
+                        <div class="relative z-10 flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <span class="text-lg font-serif-tc font-bold tracking-wider">${y} 年 ${m} 月</span>
+                                    <div class="flex gap-1">
+                                        <button onclick="changeMonth(-1)" class="bg-white/20 p-1 rounded-md active:scale-90"><i class="ph ph-caret-left text-sm"></i></button>
+                                        <button onclick="changeMonth(1)" class="bg-white/20 p-1 rounded-md active:scale-90"><i class="ph ph-caret-right text-sm"></i></button>
+                                    </div>
+                                </div>
+                                
+                                <p class="text-[11px] font-medium mb-1 opacity-80 tracking-widest">本月結餘 (${titleText})</p>
+                                <h3 class="text-4xl font-serif-tc font-black mb-6 tracking-wide"><span class="text-lg mr-1 font-sans">NT$</span>${net.toLocaleString()}</h3>
+                                
+                                <div class="flex gap-6 pt-2 border-t border-white/20">
+                                    <div><p class="text-[10px] flex items-center gap-1 opacity-80 mb-0.5"><i class="ph ph-trend-up"></i>收入</p><p class="text-sm font-bold opacity-90">NT$ ${inc.toLocaleString()}</p></div>
+                                    <div><p class="text-[10px] flex items-center gap-1 opacity-80 mb-0.5"><i class="ph ph-trend-down"></i>支出</p><p class="text-sm font-bold text-[#ffb8b8]">NT$ ${exp.toLocaleString()}</p></div>
+                                </div>
+                            </div>
+                            
+                            <div class="w-24 h-24 rounded-full flex flex-col items-center justify-center shrink-0 shadow-inner mt-6 relative" style="background: conic-gradient(#e3b873 ${ratioDeg}deg, rgba(255,255,255,0.1) ${ratioDeg}deg);">
+                                <div class="absolute inset-[6px] rounded-full flex flex-col items-center justify-center" style="background-color: ${bgColorCode};">
+                                    <span class="text-[9px] opacity-80 tracking-widest block mb-0.5 text-white">支出占比</span>
+                                    <span class="text-xl font-bold font-serif-tc text-white">${expRatio}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+
+            const container = document.getElementById('currencyDashboard');
+            container.innerHTML = html;
+            
+            updateCurrencyIndicators();
+
+            if (dashboardObserver) dashboardObserver.disconnect();
+            dashboardObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const newCurr = entry.target.getAttribute('data-currency');
+                        if (currentCurrency !== newCurr) {
+                            currentCurrency = newCurr;
+                            updateCurrencyIndicators();
+                            renderAnalytics();
+                            renderHistory();
+                        }
+                    }
+                });
+            }, { root: container, threshold: 0.6 });
+            
+            Array.from(container.children).forEach(child => dashboardObserver.observe(child));
+            
+            setTimeout(() => {
+                const activeCard = container.querySelector(`[data-currency="${currentCurrency}"]`);
+                if (activeCard) activeCard.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+            }, 50);
+        }
+
+        function updateCurrencyIndicators() {
+            const container = document.getElementById('currencyIndicators');
+            if(container) {
+                container.innerHTML = ['TWD', 'JPY'].map(c => `
+                    <div onclick="switchCurrency('${c}')" class="cursor-pointer h-2 rounded-full transition-all duration-300 ${c === currentCurrency ? (c === 'TWD' ? 'bg-indigo-500 w-6' : 'bg-rose-500 w-6') : 'bg-gray-300 w-2'} hover:opacity-80"></div>
+                `).join('');
+            }
+        }
+
+        function switchCurrency(curr) {
+            const container = document.getElementById('currencyDashboard');
+            const card = container.querySelector(`[data-currency="${curr}"]`);
+            if(card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
         }
 
         function setFilterType(type) {
@@ -404,115 +511,96 @@
 
         function renderAnalytics() {
             const container = document.getElementById('analyticsContent');
+            if(!container) return;
             const y = currentViewDate.getFullYear(), m = String(currentViewDate.getMonth() + 1).padStart(2, '0');
-            const targetRecords = records.filter(r => r.date.startsWith(`${y}-${m}`) && r.type === filterType);
-            const total = targetRecords.reduce((s, r) => s + r.amount, 0);
+            // 修正：圖表資料篩選嚴格綁定當前切換的幣別 (currentCurrency)，不混合顯示台幣與日幣
+            const expRecords = records.map(getComputedRecord).filter(r => r.date.startsWith(`${y}-${m}`) && r.type === 'expense' && r.c_currency === currentCurrency);
+            const total = expRecords.reduce((s, r) => s + r.c_amount, 0);
 
-            if(total === 0) { container.innerHTML = `<div class="py-10 text-xs text-gray-400">尚無資料</div>`; return; }
+            if(total === 0) { container.innerHTML = `<div class="py-4 text-center text-[10px] text-[#a39a8c]">尚無資料</div>`; return; }
 
             const catData = {}; 
-            targetRecords.forEach(r => {
-                const main = r.category.split('-')[0] || '其他';
-                catData[main] = (catData[main] || 0) + r.amount;
+            expRecords.forEach(r => {
+                const parts = (r.category || '').split('-');
+                const main = parts.length > 1 ? parts[1] : (parts[0] || '其他');
+                catData[main] = (catData[main] || 0) + r.c_amount;
             });
 
-            let listHtml = '<div class="w-full mt-6 space-y-3">';
-            Object.keys(catData).sort((a,b)=>catData[b]-catData[a]).forEach((main, i) => {
-                const color = ['#6366f1', '#a855f7', '#ec4899', '#f43f5e', '#f97316', '#14b8a6'][i % 6];
-                listHtml += `<div class="flex justify-between items-center text-sm"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${color}"></span><span class="font-bold">${main}</span></div><span class="${getAmountColor(catData[main], filterType)}">${catData[main].toLocaleString()}</span></div>`;
+            let listHtml = '';
+            const colors = ['#c07c7c', '#5b83a6', '#e3b873', '#e0c89b', '#d1d5db', '#7a8b76'];
+            
+            Object.keys(catData).sort((a,b)=>catData[b]-catData[a]).slice(0, 5).forEach((main, i) => {
+                const pct = Math.round((catData[main] / total) * 100);
+                listHtml += `
+                <div class="flex justify-between items-center text-[11px]">
+                    <div class="flex items-center gap-2 w-20">
+                        <span class="w-2 h-2 rounded-full shrink-0" style="background:${colors[i % colors.length]}"></span>
+                        <span class="text-[#4a4238] truncate">${main}</span>
+                    </div>
+                    <span class="text-[#6b6255] w-8 text-right">${pct}%</span>
+                    <span class="text-[#4a4238] font-bold w-12 text-right">${catData[main].toLocaleString()}</span>
+                </div>`;
             });
-            container.innerHTML = `<div class="font-black text-2xl text-indigo-900 drop-shadow-sm">$${total.toLocaleString()}</div>${listHtml}</div>`;
+            container.innerHTML = listHtml;
         }
 
         function renderHistory() {
             const list = document.getElementById('historyList');
+            if(!list) return;
             const y = currentViewDate.getFullYear(), m = String(currentViewDate.getMonth() + 1).padStart(2, '0');
-            const targetRecords = records.filter(r => r.date.startsWith(`${y}-${m}`) && r.type === filterType).sort((a,b)=>b.date.localeCompare(a.date));
-            if(targetRecords.length === 0) { list.innerHTML = `<div class="p-8 text-center text-gray-400 text-sm border rounded-xl">無明細</div>`; return; }
+            
+            // 修正：明細歷史清單嚴格限制必須等於目前選定的頁籤幣別 (r.c_currency === currentCurrency)，防止台日幣混合出現
+            const targetRecords = records.map(getComputedRecord).filter(r => r.date.startsWith(`${y}-${m}`) && r.c_currency === currentCurrency).sort((a,b)=>b.date.localeCompare(a.date));
+            
+            if(targetRecords.length === 0) { list.innerHTML = `<div class="p-8 text-center text-[#a39a8c] text-xs glass-panel rounded-2xl">無明細</div>`; return; }
 
             let html = '';
-            let lastDate = '';
             const daysOfWeek = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
-            
-            // 從本地端抓取由雲端 GAS 同步下來的假日清單，若無資料則預設為空陣列
-            let specialDays = [];
-            const savedHolidays = localStorage.getItem('excel_holidays');
-            if (savedHolidays) {
-                specialDays = JSON.parse(savedHolidays);
-            }
 
             targetRecords.forEach(r => {
-                const currentDate = r.date;
+                const dateObj = new Date(r.date.replace(/-/g, '/'));
+                const shortDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+                const dayName = daysOfWeek[dateObj.getDay()];
                 
-                // 當日期與上一筆不同時，產生新的日期群組標頭
-                if (currentDate !== lastDate) {
-                    if (lastDate !== '') {
-                        html += '</div></div>'; // 閉合前一個日期的群組容器
-                    }
-                    
-                    // 穩健轉換日期並取得星期名稱
-                    const dateObj = new Date(currentDate.replace(/-/g, '/'));
-                    const dayNum = currentDate.substring(8);
-                    const dayName = daysOfWeek[dateObj.getDay()];
-                    
-                    // 【修正】改用 filter 篩選出該日期的「所有」屬性，避免雙重身分(既是特休又是生日)被忽略
-                    const currentDayEvents = specialDays.filter(d => d.date === currentDate);
-                    const memorialEvent = currentDayEvents.find(d => d.type === 'memorial');
-                    const holidayEvent = currentDayEvents.find(d => d.type === 'holiday');
-                    
-                    // 判斷是否為假日 (週末或存在於假日清單中)
-                    const isHoliday = dateObj.getDay() === 0 || dateObj.getDay() === 6 || holidayEvent;
-                    
-                    // 預設為平日顏色
-                    let dateColorClass = 'text-gray-800';
-                    let dayColorClass = 'text-gray-400 font-bold';
-                    let badgeHtml = '';
+                let displayNote = r.note || '';
+                if (r.c_currency === 'JPY') displayNote = displayNote.replace(/^\[JPY [\d,]+\]\s*/, '');
+                if (!displayNote || displayNote === '無備註') displayNote = (r.category || '').split('-').pop() || '未分類';
 
-                    // 【修正】只有「假日或週末」會將左側數字與星期變成紅色，紀念日不再干涉此處顏色
-                    if (isHoliday) {
-                        dateColorClass = 'text-red-500';
-                        dayColorClass = 'text-red-500 font-bold';
-                    }
-
-                    // 【修正】徽章獨立判斷：只要有紀念日屬性，就獨立在右方安插綠色名稱標籤
-                    if (memorialEvent && memorialEvent.name) {
-                        badgeHtml = `<span class="ml-3 px-2 py-0.5 rounded-md text-[11px] font-bold tracking-widest shadow-sm border border-white/50 text-emerald-700 bg-emerald-100">${memorialEvent.name}</span>`;
-                    }
-                    
-                    html += `
-                    <div class="space-y-2 mb-4">
-                        <div class="flex items-baseline gap-2 mt-4 px-1">
-                            <span class="text-xl font-black ${dateColorClass}">${dayNum}</span>
-                            <span class="text-xs ${dayColorClass}">${dayName}</span>
-                            ${badgeHtml}
-                        </div>
-                        <div class="bg-white rounded-2xl shadow-sm border overflow-hidden divide-y divide-gray-50">`;
-                    
-                    lastDate = currentDate;
-                }
-
-                let badgeClass = "bg-gray-100 text-gray-600";
-                if (r.account === '現金') badgeClass = "bg-[#fef08a]/50 text-yellow-700";
-                else if (r.account === '中信卡') badgeClass = "bg-[#a7f3d0]/50 text-emerald-700";
-                else if (r.account === '玉山卡') badgeClass = "bg-[#fbcfe8]/50 text-pink-700";
-                else if (r.account) badgeClass = "bg-emerald-50 text-emerald-600";
-
-                const accBadge = r.account ? `<span class="${badgeClass} px-1.5 py-0.5 rounded text-[10px] ml-2 font-bold">${r.account}</span>` : '';
+                const mainCat = (r.category || '').split('-')[0] || '其他';
+                let catIcon = 'ph-receipt';
+                if(mainCat.includes('食')) catIcon = 'ph-bowl-food';
+                if(mainCat.includes('交通') || displayNote.includes('JR')) catIcon = 'ph-train';
+                if(mainCat.includes('購物') || displayNote.includes('Bic')) catIcon = 'ph-shopping-bag';
+                if(r.type === 'income') catIcon = 'ph-wallet';
                 
-                // 移除了內層重複顯示的月日字串，精準呈現備註內容
+                const bgCircleColor = r.type === 'expense' ? 'bg-[#f3e5e1] text-[#c07c7c]' : 'bg-[#e2eadf] text-[#7a8b76]';
+                const amtSign = r.type === 'expense' ? '- ' : '+ ';
+                const amtColor = r.type === 'expense' ? 'text-[#c07c7c]' : 'text-[#7a8b76]';
+                
+                let currencyDisp = r.c_currency === 'TWD' ? 'NT$ ' : '¥ ';
+                let accIcon = r.account === '現金' ? 'ph-wallet' : (r.account === '玉山銀行' ? 'ph-bank' : 'ph-credit-card');
+                
                 html += `
-                <div onclick="editRecord('${r.id}')" class="p-4 flex justify-between items-center hover:bg-gray-50 active:bg-gray-100 cursor-pointer">
-                    <div>
-                        <p class="text-sm font-bold text-gray-800">${r.category.replace('-', ' > ')} ${accBadge}</p>
-                        <p class="text-xs text-gray-400 font-mono mt-1">${r.note}</p>
+                <div onclick="editRecord('${r.id}')" class="glass-panel p-3.5 rounded-[20px] flex justify-between items-center hover:bg-white/90 cursor-pointer shadow-sm active:scale-[0.98] transition-transform">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-[#f5f0e6] border border-[#e2d5c4] rounded-xl py-1.5 px-2 text-center w-12 shrink-0 shadow-inner">
+                            <span class="text-[11px] font-bold text-[#4a4238] block leading-tight">${shortDate}</span>
+                            <span class="text-[9px] text-[#6b6255] block leading-tight mt-0.5">${dayName}</span>
+                        </div>
+                        <div class="w-10 h-10 rounded-full ${bgCircleColor} flex items-center justify-center shrink-0">
+                            <i class="ph-fill ${catIcon} text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-[#4a4238]">${displayNote}</p>
+                            <p class="text-[10px] text-[#a39a8c] mt-0.5 flex items-center gap-1"><i class="ph ${accIcon}"></i> ${r.account || '現金'}</p>
+                        </div>
                     </div>
-                    <span class="text-base ${getAmountColor(r.amount, r.type)}">${r.amount.toLocaleString()}</span>
+                    <div class="text-right">
+                        <span class="text-sm font-bold tracking-wider ${amtColor}">${amtSign}${currencyDisp}${r.c_amount.toLocaleString()}</span>
+                        <span class="text-[9px] text-[#a39a8c] block mt-1 tracking-widest">${r.c_currency}</span>
+                    </div>
                 </div>`;
             });
-
-            if (html !== '') {
-                html += '</div></div>'; // 閉合最後一個群組容器
-            }
 
             list.innerHTML = html;
         }
@@ -560,17 +648,29 @@
             document.getElementById('btn-delete').classList.add('hidden');
             document.getElementById('input-date').value = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`;
             document.getElementById('input-amount').value = ''; document.getElementById('input-note').value = '';
+            document.getElementById('input-currency').value = localStorage.getItem('excel_lastCurrency') || 'TWD';
             setRecordType(filterType);
             toggleModal('addRecordModal', 'addRecordContent', true);
         }
 
         function editRecord(id) {
             editingRecordId = id; const r = records.find(x => x.id === id); if(!r) return;
+            const comp = getComputedRecord(r);
             document.getElementById('modalTitle').innerText = '編輯紀錄';
             document.getElementById('btn-delete').classList.remove('hidden');
             document.getElementById('input-date').value = r.date;
-            document.getElementById('input-note').value = r.note === '無備註' ? '' : r.note;
-            document.getElementById('input-amount').value = r.amount;
+            
+            let editNote = r.note;
+            if(comp.c_currency === 'JPY') {
+                editNote = editNote.replace(/^\[JPY [\d,]+\]\s*/, '');
+                if(editNote === '未填品名') editNote = '';
+            } else {
+                if(editNote === '無備註') editNote = '';
+            }
+            
+            document.getElementById('input-note').value = editNote;
+            document.getElementById('input-amount').value = comp.c_amount;
+            document.getElementById('input-currency').value = comp.c_currency;
             setRecordType(r.type || 'expense');
             if(r.account) document.getElementById('input-account-main').value = r.account;
             
@@ -598,7 +698,20 @@
                 if (found) oldRec = JSON.parse(JSON.stringify(found));
             }
             
-            const rec = { id: editingRecordId || (new Date().getTime().toString()), type: currentModalRecordType, account: acc, date: d, category: cat, note: n||"無備註", amount: parseFloat(a), currency: 'TWD' };
+            localStorage.setItem('excel_lastCurrency', document.getElementById('input-currency').value);
+
+            let finalAmount = parseFloat(a);
+            let finalNote = n || "無備註";
+            const selectedCurrency = document.getElementById('input-currency').value;
+
+            if (selectedCurrency === 'JPY') {
+                const jpyRate = 0.22; 
+                finalAmount = Math.round(parseFloat(a) * jpyRate); 
+                const prefix = `[JPY ${parseFloat(a).toLocaleString()}] `;
+                finalNote = finalNote === "無備註" ? `${prefix}未填品名` : `${prefix}${finalNote}`;
+            }
+            
+            const rec = { id: editingRecordId || (new Date().getTime().toString()), type: currentModalRecordType, account: acc, date: d, category: cat, note: finalNote, amount: finalAmount, currency: 'TWD' };
             if(editingRecordId) records[records.findIndex(x=>x.id===editingRecordId)] = rec; else records.push(rec);
             
             localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
@@ -623,6 +736,12 @@
         function openSettings() { toggleModal('settingsModal', 'settingsContent', true); }
         function closeSettings() { toggleModal('settingsModal', 'settingsContent', false); }
         
+        // UI 面板開關控制
+        function openAccountModal() { toggleModal('accountModal', 'accountContent', true); }
+        function closeAccountModal() { toggleModal('accountModal', 'accountContent', false); }
+        function openChartModal() { toggleModal('chartModal', 'chartContent', true); }
+        function closeChartModal() { toggleModal('chartModal', 'chartContent', false); }
+
         function saveGasConfig() { gasConfig.url = document.getElementById('cfg-gas-url').value.trim(); localStorage.setItem('excel_gasConfig', JSON.stringify(gasConfig)); document.getElementById('settings-msg').innerText="已儲存"; document.getElementById('settings-msg').style.opacity=1; }
         
         function updateCloudIcon(st) {
@@ -632,7 +751,6 @@
             else { i.innerHTML='<i class="ph ph-cloud-warning text-2xl text-red-500 cursor-pointer"></i>'; }
         }
 
-        // 當單筆寫入時，傳送給 Google Apps Script，系統回傳完整的隱藏資料庫紀錄以確保本地100%同步
         async function syncSingleToGAS(act, rec, oldRec = null) {
             if(!gasConfig.url) return; updateCloudIcon('sync');
             let bodyData = { action: act, yearMap: yearSheetMap };
@@ -675,7 +793,6 @@
                 } catch(e) { updateCloudIcon('err'); console.error(e); }
         }
 
-        // 開機/手動按雲時，跟 Google 進行隱藏表同步
         async function autoPullFromGAS(isManual = false) {
         if(!gasConfig.url) {
             if(isManual) alert("請先到設定輸入 Google Apps Script 網址！");
@@ -688,10 +805,9 @@
             const res = await fetch(gasConfig.url, { method: 'POST', body: JSON.stringify({action: 'pull', yearMap: yearSheetMap, targetSheetId: sId}) });
             const result = await res.json();
                 if(result.records && Array.isArray(result.records)) {
-                    records = result.records; // 完全以雲端資料為基準 (因為多手機雙向同步)
+                    records = result.records; 
                     localStorage.setItem('excel_expenseRecords', JSON.stringify(records));
                     
-                    // 接收雲端傳來的假日清單，並由前端自動補零轉換格式
                     if(result.holidays && Array.isArray(result.holidays)) {
                         const formattedHolidays = result.holidays.map(item => {
                             let parts = [];
@@ -703,7 +819,6 @@
                                 parts = str.split('-');
                             }
                             
-                            // 將接收到的 2026/1/1 切割並自動補零轉換為 2026-01-01
                             if(parts.length >= 3) {
                                 fDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].substring(0, 2).padStart(2, '0')}`;
                             }
@@ -722,8 +837,6 @@
         async function forceSyncUploadGAS() {
             autoPullFromGAS(true);
         }
-
-        
 
         function exportData() {
             const backupData = {
@@ -749,7 +862,6 @@
                     localStorage.setItem('excel_expenseRecords', JSON.stringify(records)); 
                     renderAll(); 
                     
-                    // 【優化】匯入成功後，如果已經有連線網址，自動觸發全量大包上傳雲端
                     if (gasConfig.url) {
                         alert('本地帳本還原成功！系統即將自動將所有歷史紀錄同步至雲端資料庫，請勿關閉網頁...');
                         syncAllToGAS();
@@ -761,7 +873,6 @@
             reader.readAsText(f); e.target.value = '';
         }
 
-        // 【新增安插】全量歷史紀錄同步推上雲端函數
         async function syncAllToGAS() {
             if(!gasConfig.url) return;
             updateCloudIcon('sync');
