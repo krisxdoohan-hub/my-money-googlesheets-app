@@ -570,16 +570,17 @@
                 const holidayMatch = holidays.find(h => h.date === r.date);
                 if (holidayMatch) {
                     if (holidayMatch.type === 'holiday') {
-                        dateColor = 'text-red-500';
-                        dayColor = 'text-red-400';
-                    } else if (holidayMatch.type === 'anniversary') {
-                        dateColor = 'text-[#5b83a6]';
+                        dateColor = 'text-[#c07c7c]'; // 使用與原版支出相同的紅色系
+                        dayColor = 'text-[#c07c7c]/80';
+                    } else {
+                        // 紀念日或其他類型，改為藍色系並加上明顯的浮動標籤
+                        dateColor = 'text-[#5b83a6]'; 
                         dayColor = 'text-[#5b83a6]/80';
-                        tagHtml = `<div class="absolute -top-2 -right-2 bg-[#5b83a6] text-white text-[8px] px-1 py-0.5 rounded shadow-sm scale-90 whitespace-nowrap z-10">${holidayMatch.name}</div>`;
+                        tagHtml = `<div class="absolute -top-2.5 -right-2 bg-[#5b83a6] text-white text-[8px] px-1.5 py-0.5 rounded-md shadow-sm whitespace-nowrap z-10 border border-white/80 tracking-widest font-bold" style="transform: scale(0.85); transform-origin: top right;">${holidayMatch.name}</div>`;
                     }
                 } else if (dateObj.getDay() === 0 || dateObj.getDay() === 6) {
-                    dateColor = 'text-red-400';
-                    dayColor = 'text-red-300';
+                    dateColor = 'text-[#c07c7c]';
+                    dayColor = 'text-[#c07c7c]/80';
                 }
                 
                 let displayNote = r.note || '';
@@ -601,7 +602,7 @@
                 let accIcon = r.account === '現金' ? 'ph-wallet' : (r.account === '玉山銀行' ? 'ph-bank' : 'ph-credit-card');
                 
                 html += `
-                <div onclick="editRecord('${r.id}')" class="glass-panel p-3.5 rounded-[20px] flex justify-between items-center hover:bg-white/90 cursor-pointer shadow-sm active:scale-[0.98] transition-transform">
+                <div onclick="editRecord('${r.id}')" class="glass-panel p-3.5 rounded-[20px] flex justify-between items-center hover:bg-white/90 cursor-pointer shadow-sm active:scale-[0.98] transition-transform mt-2">
                     <div class="flex items-center gap-3">
                         <div class="bg-[#f5f0e6] border border-[#e2d5c4] rounded-xl py-1.5 px-2 text-center w-12 shrink-0 shadow-inner relative">
                             ${tagHtml}
