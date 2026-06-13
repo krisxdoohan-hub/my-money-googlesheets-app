@@ -656,11 +656,23 @@
                 
                 let currencyDisp = r.c_currency === 'TWD' ? 'NT$ ' : '¥ ';
                 
-                // 修正帳戶圖示判斷，改用模糊比對涵蓋「玉山卡」與「中信卡」
-                let accIcon = 'ph-wallet';
-                if (r.account) {
-                    if (r.account.includes('玉山')) accIcon = 'ph-bank';
-                    else if (r.account.includes('卡')) accIcon = 'ph-credit-card';
+                // 依據不同帳戶類型，動態配置專屬的高辨識度彩色膠囊標籤樣式與實心圖示
+                let accBadgeClass = 'text-gray-600 bg-gray-100 border border-gray-200/80 px-1.5 py-0.5 rounded-md font-bold';
+                let accIcon = 'ph-wallet-fill';
+                const currentAccount = r.account || '現金';
+                
+                if (currentAccount.includes('中信')) {
+                    accIcon = 'ph-credit-card-fill';
+                    accBadgeClass = 'text-blue-700 bg-blue-50 border border-blue-200/70 px-1.5 py-0.5 rounded-md font-bold';
+                } else if (currentAccount.includes('玉山')) {
+                    accIcon = 'ph-bank-fill';
+                    accBadgeClass = 'text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-1.5 py-0.5 rounded-md font-bold';
+                } else if (currentAccount.includes('現金')) {
+                    accIcon = 'ph-wallet-fill';
+                    accBadgeClass = 'text-amber-800 bg-amber-50 border border-amber-200/70 px-1.5 py-0.5 rounded-md font-bold';
+                } else if (currentAccount.includes('系統')) {
+                    accIcon = 'ph-cpu-fill';
+                    accBadgeClass = 'text-purple-700 bg-purple-50 border border-purple-200/70 px-1.5 py-0.5 rounded-md font-bold';
                 }
                 
                 html += `
@@ -676,7 +688,7 @@
                         </div>
                         <div>
                             <p class="text-sm font-bold text-[#4a4238]">${displayNote}</p>
-                            <p class="text-[10px] text-[#a39a8c] mt-0.5 flex items-center gap-1"><i class="ph ${accIcon}"></i> ${r.account || '現金'}</p>
+                            <div class="mt-1"><span class="text-[9px] inline-flex items-center gap-1 ${accBadgeClass}"><i class="ph ${accIcon}"></i>${currentAccount}</span></div>
                         </div>
                     </div>
                     <div class="text-right">
