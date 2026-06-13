@@ -556,11 +556,31 @@
 
             let html = '';
             const daysOfWeek = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+            const holidays = JSON.parse(localStorage.getItem('excel_holidays') || '[]');
 
             targetRecords.forEach(r => {
                 const dateObj = new Date(r.date.replace(/-/g, '/'));
                 const shortDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
                 const dayName = daysOfWeek[dateObj.getDay()];
+                
+                let dateColor = 'text-[#4a4238]';
+                let dayColor = 'text-[#6b6255]';
+                let tagHtml = '';
+                
+                const holidayMatch = holidays.find(h => h.date === r.date);
+                if (holidayMatch) {
+                    if (holidayMatch.type === 'holiday') {
+                        dateColor = 'text-red-500';
+                        dayColor = 'text-red-400';
+                    } else if (holidayMatch.type === 'anniversary') {
+                        dateColor = 'text-[#5b83a6]';
+                        dayColor = 'text-[#5b83a6]/80';
+                        tagHtml = `<div class="absolute -top-2 -right-2 bg-[#5b83a6] text-white text-[8px] px-1 py-0.5 rounded shadow-sm scale-90 whitespace-nowrap z-10">${holidayMatch.name}</div>`;
+                    }
+                } else if (dateObj.getDay() === 0 || dateObj.getDay() === 6) {
+                    dateColor = 'text-red-400';
+                    dayColor = 'text-red-300';
+                }
                 
                 let displayNote = r.note || '';
                 if (r.c_currency === 'JPY') displayNote = displayNote.replace(/^\[JPY [\d,]+\]\s*/, '');
@@ -583,9 +603,10 @@
                 html += `
                 <div onclick="editRecord('${r.id}')" class="glass-panel p-3.5 rounded-[20px] flex justify-between items-center hover:bg-white/90 cursor-pointer shadow-sm active:scale-[0.98] transition-transform">
                     <div class="flex items-center gap-3">
-                        <div class="bg-[#f5f0e6] border border-[#e2d5c4] rounded-xl py-1.5 px-2 text-center w-12 shrink-0 shadow-inner">
-                            <span class="text-[11px] font-bold text-[#4a4238] block leading-tight">${shortDate}</span>
-                            <span class="text-[9px] text-[#6b6255] block leading-tight mt-0.5">${dayName}</span>
+                        <div class="bg-[#f5f0e6] border border-[#e2d5c4] rounded-xl py-1.5 px-2 text-center w-12 shrink-0 shadow-inner relative">
+                            ${tagHtml}
+                            <span class="text-[11px] font-bold ${dateColor} block leading-tight">${shortDate}</span>
+                            <span class="text-[9px] ${dayColor} block leading-tight mt-0.5">${dayName}</span>
                         </div>
                         <div class="w-10 h-10 rounded-full ${bgCircleColor} flex items-center justify-center shrink-0">
                             <i class="ph-fill ${catIcon} text-xl"></i>
