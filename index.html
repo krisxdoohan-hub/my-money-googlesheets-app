@@ -78,7 +78,7 @@
                 <h1 class="text-2xl font-black font-serif-tc tracking-widest text-[#4a4238]">私人記帳本</h1>
                 <div class="bg-[#ba4c45] text-white text-[8px] px-1 py-0.5 rounded-sm font-serif-tc shadow-sm" style="writing-mode: vertical-lr;">足跡</div>
             </div>
-            <span class="text-sm font-serif-tc text-[#6b6255] tracking-widest">京都旅人財務手帳</span>
+            <span class="text-sm font-serif-tc text-[#6b6255] tracking-widest">旅人財務手帳 <span id="ui-version-display" class="text-[10px] font-sans font-bold text-[#a39a8c] ml-1 bg-white/50 px-1.5 py-0.5 rounded-md border border-[#e2d5c4]"></span></span>
         </div>
         <div class="flex items-center gap-3">
             <button id="cloud-status-icon" onclick="forceSyncUploadGAS()" class="flex items-center gap-1 bg-white/70 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm border border-white focus:outline-none hover:bg-white transition">
@@ -135,9 +135,8 @@
                         <h3 class="text-xs font-bold text-[#4a4238] tracking-widest">帳戶總覽</h3>
                         <i class="ph ph-caret-right text-[#a39a8c]"></i>
                     </div>
-                    <div id="accountSummaryContent" class="space-y-3 flex-1 flex items-center justify-center">
-                        <span class="text-[11px] text-[#a39a8c] tracking-widest font-bold">未連結雲端資料庫</span>
-                    </div>
+                    <div id="accountSummaryContent" class="space-y-2.5 flex-1 overflow-y-auto no-scrollbar">
+                        </div>
                 </div>
             </div>
         </div>
@@ -368,6 +367,9 @@
         async function init() {
             clearPass();
             
+            // 動態綁定版號顯示
+            document.getElementById('ui-version-display').innerText = 'v' + APP_VERSION;
+            
             if (!localStorage.getItem('excel_expenseRecords') && localStorage.getItem('expenseRecords')) {
                 localStorage.setItem('excel_expenseRecords', localStorage.getItem('expenseRecords'));
                 if (localStorage.getItem('moneyAppGasConfig')) localStorage.setItem('excel_gasConfig', localStorage.getItem('moneyAppGasConfig'));
@@ -398,6 +400,7 @@
             
             renderCurrencyDashboard();
             renderAnalytics();
+            renderAccountSummary(); // 新增：呼叫帳戶總覽渲染
             renderHistory();
         }
 
@@ -543,6 +546,43 @@
             });
             container.innerHTML = listHtml;
         }
+
+        // --- 以下為新增的帳戶總覽渲染邏輯 ---
+        function renderAccountSummary() {
+            const container = document.getElementById('accountSummaryContent');
+            if(!container) return;
+            const y = currentViewDate.getFullYear(), m = String(currentViewDate.getMonth() + 1).padStart(2, '0');
+            
+            // 篩選本月、符合當前幣別的支出紀錄
+            const expRecords = records.map(getComputedRecord).filter(r => r.date.startsWith(`${y}-${m}`) && r.type === 'expense' && r.c_currency === currentCurrency);
+            
+            if(expRecords.length === 0) { 
+                container.innerHTML = `<div class="py-4 text-center text-[10px] text-[#a39a8c]">尚無帳戶扣款資料</div>`; 
+                return; 
+            }
+
+            const accData = {};
+            expRecords.forEach(r => {
+                const acc = r.account || '現金';
+                accData[acc] = (accData[acc] || 0) + r.c_amount;
+            });
+
+            let listHtml = '';
+            // 依支出金額由大到小排序排列
+            Object.keys(accData).sort((a,b)=>accData[b]-accData[a]).forEach(acc => {
+                let accIcon = acc === '現金' ? 'ph-wallet' : (acc.includes('玉山') ? 'ph-bank' : 'ph-credit-card');
+                listHtml += `
+                <div class="flex justify-between items-center text-[11px]">
+                    <div class="flex items-center gap-2">
+                        <i class="ph ${accIcon} text-[#7a8b76] text-sm"></i>
+                        <span class="text-[#4a4238]">${acc}</span>
+                    </div>
+                    <span class="text-[#4a4238] font-bold text-right">${accData[acc].toLocaleString()}</span>
+                </div>`;
+            });
+            container.innerHTML = listHtml;
+        }
+        // --- 新增結束 ---
 
         function renderHistory() {
             const list = document.getElementById('historyList');
